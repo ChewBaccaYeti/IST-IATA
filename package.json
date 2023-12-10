@@ -17,5 +17,8 @@
     "moment-timezone": "^0.5.43",
     "redis": "^4.6.11",
     "request": "^2.88.2"
+  },
+  "devDependencies": {
+    "morgan": "^1.10.0"
   }
 }
