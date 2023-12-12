@@ -22,6 +22,9 @@
     "nodemon": "^3.0.2",
     "redis": "^4.6.11"
   },
+  "exports": {
+    "./lib/api/traversing": "./lib/api/traversing.js"
+  },
   "devDependencies": {
     "morgan": "^1.10.0"
   }

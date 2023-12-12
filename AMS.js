@@ -1,5 +1,6 @@
 const async = require('async');
 const axios = require('axios').default;
+const cheerio = require('cheerio');
 const colors = require('colors').default;
 const express = require('express');
 const moment = require('moment-timezone');
@@ -53,7 +54,7 @@ app.listen(PORT, () => {
 const generateRequestOptions = (pageNumber) => {
     return {
         method: 'POST',
-        url: base_URL,
+        url: BASE_URL,
         headers: HEADERS,
         data: {
             nature: '1',
@@ -88,6 +89,7 @@ async.eachLimit(
                         dep_checkin: null,
                         aircraft_type: null,
                         reg_number: null,
+                        page_number: pageNumber,
                     };
                 });
 
