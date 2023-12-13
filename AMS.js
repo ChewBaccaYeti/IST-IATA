@@ -3,7 +3,9 @@ const axios = require('axios').default;
 const cheerio = require('cheerio');
 const colors = require('colors').default;
 const express = require('express');
+const proxy = require('express-http-proxy');
 const moment = require('moment-timezone');
+const _ = require('lodash');
 
 const BASE_URL =
     'https://www.istairport.com/umbraco/api/FlightInfo/GetFlightStatusBoard';
@@ -39,6 +41,19 @@ const tomorrow = moment().add(1, 'days').format('YYYY-MM-DD');
 
 const app = express();
 
+const proxyMiddleware = proxy(BASE_URL, {
+    parseReqBody: false, // Disable body parsing to keep original request body
+    reqAsBuffer: true, // Keep the request body as a buffer
+    timeout: 2000, // Timeout for the proxy request in milliseconds
+    preserveHostHdr: true, // Preserve the host header of the original request
+    limit: '10mb', // Limit the size of the response body
+    userResDecorator: (proxyRes, proxyResData, userReq, userRes) => {
+        return proxyResData;
+    },
+});
+
+app.use(PROXY, proxyMiddleware);
+
 app.use((req, res, next) => {
     res.setHeader(
         'Content-Security-Policy',
@@ -47,9 +62,18 @@ app.use((req, res, next) => {
     next();
 });
 
+app.listen(proxyMiddleware, () => {
+    console.log(`Proxy started`.bgMagenta.bold);
+    console.log(
+        `[${moment().format('HH:mm')}]${PROXY} connected`.bgMagenta.bold
+    );
+});
+
 app.listen(PORT, () => {
     console.log(`Server started on port ${PORT}`.bgYellow.bold);
 });
+
+const pageCount = 10;
 
 const generateRequestOptions = (pageNumber) => {
     return {
@@ -59,8 +83,8 @@ const generateRequestOptions = (pageNumber) => {
         data: {
             nature: '1',
             searchTerm: 'changeflight',
-            pageNumber: pageNumber.toString(),
-            pageSize: '10',
+            pageNumber: pageNumber,
+            pageSize: pageCount,
             isInternational: '1',
             '': [`date=${today}`, `endDate=${tomorrow}`],
             culture: 'en',
@@ -70,19 +94,15 @@ const generateRequestOptions = (pageNumber) => {
     };
 };
 
-const pageCount = 10;
-
 async.eachLimit(
     Array.from({ length: pageCount }, (_, i) => i + 1),
     20,
     (pageNumber, callback) => {
         const options = generateRequestOptions(pageNumber);
-
         axios
             .request(options)
             .then((response) => {
                 const flightsArray = response.data.result.data.flights;
-
                 const flightsWithNewFields = flightsArray.map((flight) => {
                     return {
                         ...flight,
@@ -92,7 +112,6 @@ async.eachLimit(
                         page_number: pageNumber,
                     };
                 });
-
                 console.log(
                     `Page ${pageNumber}:`.blue.bold,
                     flightsWithNewFields
@@ -111,7 +130,7 @@ async.eachLimit(
         if (err) {
             console.error('Error:'.red.bold, err);
         } else {
-            console.log('All requests completed successfully.'.green);
+            console.log('All requests completed successfully.'.green.bold);
         }
     }
 );
