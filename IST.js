@@ -1,15 +1,18 @@
 const async = require('async');
 const axios = require('axios').default;
-const cheerio = require('cheerio');
 const colors = require('colors').default;
 const express = require('express');
 const proxy = require('express-http-proxy');
 const moment = require('moment-timezone');
-const _ = require('lodash');
+const redis = require('redis');
 
+const PORT = 3000;
 const BASE_URL =
     'https://www.istairport.com/umbraco/api/FlightInfo/GetFlightStatusBoard';
+const PROXY = 'http://iydv9uop:7rSHfY6iR6dBQRnX@proxy.proxy-cheap.com:31112';
 const FMT = 'YYYY-MM-DD HH:mm';
+const today = moment().format(FMT);
+const tomorrow = moment().add(1, 'days').format(FMT);
 const HEADERS = {
     Accept: 'application/json, text/javascript, */*; q=0.01',
     'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
@@ -30,21 +33,18 @@ const HEADERS = {
     'sec-ch-ua-mobile': '?0',
     'sec-ch-ua-platform': '^^Windows^^',
 };
-const PORT = 3000;
-const PROXY = 'http://iydv9uop:7rSHfY6iR6dBQRnX@proxy.proxy-cheap.com:31112';
-const REDIS_KEY = 'airports:Istanbul';
-const REDIS_URL = 'redis://localhost:8080';
-const TIMEZONE = 'Europe/Istanbul';
 
-const today = moment().format('YYYY-MM-DD');
-const tomorrow = moment().add(1, 'days').format('YYYY-MM-DD');
+const redis_URL = 'redis://localhost:6379';
+const redis_KEY = 'airport:Istanbul';
+
+const TIMEZONE = 'Europe/Istanbul';
 
 const app = express();
 
 const proxyMiddleware = proxy(BASE_URL, {
-    parseReqBody: false, // Disable body parsing to keep original request body
+    parseReqBody: false, // Disable body parsing to keep the original request body
     reqAsBuffer: true, // Keep the request body as a buffer
-    timeout: 2000, // Timeout for the proxy request in milliseconds
+    timeout: 5000, // Timeout for the proxy request in milliseconds
     preserveHostHdr: true, // Preserve the host header of the original request
     limit: '10mb', // Limit the size of the response body
     userResDecorator: (proxyRes, proxyResData, userReq, userRes) => {
@@ -63,9 +63,9 @@ app.use((req, res, next) => {
 });
 
 app.listen(proxyMiddleware, () => {
-    console.log(`Proxy started`.bgMagenta.bold);
     console.log(
-        `[${moment().format('HH:mm')}]${PROXY} connected`.bgMagenta.bold
+        `Proxy started [${moment().format('HH:mm')}]${PROXY} connected`.bgCyan
+            .bold
     );
 });
 
@@ -94,27 +94,32 @@ const generateRequestOptions = (pageNumber) => {
     };
 };
 
+let flightsWithNewFields = [];
+
 async.eachLimit(
     Array.from({ length: pageCount }, (_, i) => i + 1),
     20,
     (pageNumber, callback) => {
         const options = generateRequestOptions(pageNumber);
+        let flightsWithNewFieldsPage;
+
         axios
             .request(options)
             .then((response) => {
                 const flightsArray = response.data.result.data.flights;
-                const flightsWithNewFields = flightsArray.map((flight) => {
-                    return {
-                        ...flight,
-                        dep_checkin: null,
-                        aircraft_type: null,
-                        reg_number: null,
-                        page_number: pageNumber,
-                    };
-                });
+                flightsWithNewFieldsPage = flightsArray.map((flight) => ({
+                    ...flight,
+                    dep_checkin: null,
+                    aircraft_type: null,
+                    reg_number: null,
+                    page_number: pageNumber,
+                }));
+                flightsWithNewFields = flightsWithNewFields.concat(
+                    flightsWithNewFieldsPage
+                );
                 console.log(
                     `Page ${pageNumber}:`.blue.bold,
-                    flightsWithNewFields
+                    flightsWithNewFieldsPage
                 );
                 callback();
             })
@@ -124,6 +129,57 @@ async.eachLimit(
                     error.message
                 );
                 callback(error);
+            })
+            .finally(() => {
+                try {
+                    const client = redis.createClient({
+                        url: redis_URL,
+                        legacyMode: true,
+                    });
+
+                    client.on('connect', () => {
+                        console.log(
+                            `[${moment().format(
+                                'HH:mm'
+                            )}][redis] Redis connected`.bgMagenta.bold
+                        );
+                        console.log(
+                            'Saving flights data to Redis...'.yellow.bold
+                        );
+                        console.log(
+                            `Key: ${redis_KEY}, Value: ${flightsWithNewFields}`
+                                .cyan.bold
+                        );
+
+                        const redis_flightsJSON =
+                            JSON.stringify(flightsWithNewFields);
+                        console.log(redis_flightsJSON);
+
+                        client.set(
+                            redis_KEY,
+                            redis_flightsJSON,
+                            (err, reply) => {
+                                if (err) {
+                                    console.error(
+                                        `Error storing flights data in Redis: ${err}`
+                                            .red.bold
+                                    );
+                                } else {
+                                    console.log(
+                                        `Flights data stored in Redis: ${reply}`
+                                            .magenta.bold
+                                    );
+                                }
+                            }
+                        );
+                    });
+                } catch (error) {
+                    console.error(
+                        `[${moment().format('HH:mm')}][redis] Redis error: %j`
+                            .bgRed.bold,
+                        error
+                    );
+                }
             });
     },
     (err) => {

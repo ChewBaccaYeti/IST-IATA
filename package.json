@@ -1,11 +1,11 @@
 {
-  "name": "ams",
+  "name": "IST-IATA",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "node AMS.js",
-    "start:dev": "nodemon AMS.js",
+    "start": "node IST.js",
+    "start:dev": "nodemon IST.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
@@ -20,6 +20,7 @@
     "express-http-proxy": "^2.0.0",
     "lodash": "^4.17.21",
     "moment-timezone": "^0.5.43",
+    "node-fetch": "^3.3.2",
     "nodemon": "^3.0.2",
     "redis": "^4.6.11",
     "request": "^2.88.2"
