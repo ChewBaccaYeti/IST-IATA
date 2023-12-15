@@ -1,15 +1,16 @@
 const async = require('async');
 const axios = require('axios').default;
+const { HttpsProxyAgent } = require('https-proxy-agent');
 const colors = require('colors').default;
 const express = require('express');
-const proxy = require('express-http-proxy');
 const moment = require('moment-timezone');
-const redis = require('redis');
 
 const PORT = 3000;
 const BASE_URL =
     'https://www.istairport.com/umbraco/api/FlightInfo/GetFlightStatusBoard';
-const PROXY = 'http://iydv9uop:7rSHfY6iR6dBQRnX@proxy.proxy-cheap.com:31112';
+const PROXY_USERNAME = 'iydv9uop';
+const PROXY_PASSWORD = '7rSHfY6iR6dBQRnX';
+const PROXY = `http://${PROXY_USERNAME}:${PROXY_PASSWORD}@proxy.proxy-cheap.com:31112`;
 const FMT = 'YYYY-MM-DD HH:mm';
 const today = moment().format(FMT);
 const tomorrow = moment().add(1, 'days').format(FMT);
@@ -37,22 +38,27 @@ const HEADERS = {
 const redis_URL = 'redis://localhost:6379';
 const redis_KEY = 'airport:Istanbul';
 
+const redis = require('redis')
+    .createClient({
+        url: redis_URL,
+        legacyMode: true,
+    })
+    .on('connect', () => {
+        console.log(
+            `Key: ${redis_KEY}, [${today}][redis] connected`.bgMagenta.bold
+        );
+        console.log('Saving flights data to Redis...'.bgMagenta.bold);
+    })
+    .on('reconnecting', (p) =>
+        console.log(`[${today}][redis] reconnecting: %j`.magenta.bold, p)
+    )
+    .on('error', (e) =>
+        console.error(`[${today}][redis] error: %j`.red.bold, e)
+    );
+
 const TIMEZONE = 'Europe/Istanbul';
 
 const app = express();
-
-const proxyMiddleware = proxy(BASE_URL, {
-    parseReqBody: false, // Disable body parsing to keep the original request body
-    reqAsBuffer: true, // Keep the request body as a buffer
-    timeout: 5000, // Timeout for the proxy request in milliseconds
-    preserveHostHdr: true, // Preserve the host header of the original request
-    limit: '10mb', // Limit the size of the response body
-    userResDecorator: (proxyRes, proxyResData, userReq, userRes) => {
-        return proxyResData;
-    },
-});
-
-app.use(PROXY, proxyMiddleware);
 
 app.use((req, res, next) => {
     res.setHeader(
@@ -62,24 +68,38 @@ app.use((req, res, next) => {
     next();
 });
 
-app.listen(proxyMiddleware, () => {
-    console.log(
-        `Proxy started [${moment().format('HH:mm')}]${PROXY} connected`.bgCyan
-            .bold
-    );
-});
-
 app.listen(PORT, () => {
     console.log(`Server started on port ${PORT}`.bgYellow.bold);
 });
 
+const agent = new HttpsProxyAgent(PROXY);
 const pageCount = 10;
+let flightsWithNewFields = [];
+
+axios.interceptors.request.use(
+    (config) => {
+        console.log(`Making request to ${config.url} via proxy.`.bgCyan.bold);
+        return config;
+    },
+    (error) => {
+        console.error(
+            `Error in request interceptor: ${error.message}`.red.bold
+        );
+        return Promise.reject(error);
+    }
+);
 
 const generateRequestOptions = (pageNumber) => {
     return {
         method: 'POST',
         url: BASE_URL,
-        headers: HEADERS,
+        headers: {
+            ...HEADERS,
+            'Proxy-Authorization': `Basic ${Buffer.from(
+                `${PROXY_USERNAME}:${PROXY_PASSWORD}`
+            ).toString('base64')}`,
+        },
+        httpAgent: agent,
         data: {
             nature: '1',
             searchTerm: 'changeflight',
@@ -93,8 +113,6 @@ const generateRequestOptions = (pageNumber) => {
         },
     };
 };
-
-let flightsWithNewFields = [];
 
 async.eachLimit(
     Array.from({ length: pageCount }, (_, i) => i + 1),
@@ -129,57 +147,6 @@ async.eachLimit(
                     error.message
                 );
                 callback(error);
-            })
-            .finally(() => {
-                try {
-                    const client = redis.createClient({
-                        url: redis_URL,
-                        legacyMode: true,
-                    });
-
-                    client.on('connect', () => {
-                        console.log(
-                            `[${moment().format(
-                                'HH:mm'
-                            )}][redis] Redis connected`.bgMagenta.bold
-                        );
-                        console.log(
-                            'Saving flights data to Redis...'.yellow.bold
-                        );
-                        console.log(
-                            `Key: ${redis_KEY}, Value: ${flightsWithNewFields}`
-                                .cyan.bold
-                        );
-
-                        const redis_flightsJSON =
-                            JSON.stringify(flightsWithNewFields);
-                        console.log(redis_flightsJSON);
-
-                        client.set(
-                            redis_KEY,
-                            redis_flightsJSON,
-                            (err, reply) => {
-                                if (err) {
-                                    console.error(
-                                        `Error storing flights data in Redis: ${err}`
-                                            .red.bold
-                                    );
-                                } else {
-                                    console.log(
-                                        `Flights data stored in Redis: ${reply}`
-                                            .magenta.bold
-                                    );
-                                }
-                            }
-                        );
-                    });
-                } catch (error) {
-                    console.error(
-                        `[${moment().format('HH:mm')}][redis] Redis error: %j`
-                            .bgRed.bold,
-                        error
-                    );
-                }
             });
     },
     (err) => {
@@ -187,6 +154,11 @@ async.eachLimit(
             console.error('Error:'.red.bold, err);
         } else {
             console.log('All requests completed successfully.'.green.bold);
+
+            console.log(
+                `Proxy is configured and requests were made via proxy: ${PROXY}`
+                    .cyan.bold
+            );
         }
     }
 );
