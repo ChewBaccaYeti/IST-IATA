@@ -8,12 +8,6 @@ const moment = require('moment-timezone');
 const PORT = 3000;
 const BASE_URL =
     'https://www.istairport.com/umbraco/api/FlightInfo/GetFlightStatusBoard';
-const PROXY_USERNAME = 'iydv9uop';
-const PROXY_PASSWORD = '7rSHfY6iR6dBQRnX';
-const PROXY = `http://${PROXY_USERNAME}:${PROXY_PASSWORD}@proxy.proxy-cheap.com:31112`;
-const FMT = 'YYYY-MM-DD HH:mm';
-const today = moment().format(FMT);
-const tomorrow = moment().add(1, 'days').format(FMT);
 const HEADERS = {
     Accept: 'application/json, text/javascript, */*; q=0.01',
     'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
@@ -35,8 +29,17 @@ const HEADERS = {
     'sec-ch-ua-platform': '^^Windows^^',
 };
 
+const PROXY_USERNAME = 'iydv9uop';
+const PROXY_PASSWORD = '7rSHfY6iR6dBQRnX';
+const PROXY = `http://${PROXY_USERNAME}:${PROXY_PASSWORD}@proxy.proxy-cheap.com:31112`;
+
+const FMT = 'YYYY-MM-DD HH:mm';
+const TMZN = 'Europe/Istanbul';
+const day = moment().tz(TMZN);
+const dates = [day.format(FMT), day.clone().add(1, 'd').format(FMT)];
+
 const redis_URL = 'redis://localhost:6379';
-const redis_KEY = 'airport:Istanbul';
+const redis_KEY = 'airports:istanbul';
 
 const redis = require('redis')
     .createClient({
@@ -44,41 +47,69 @@ const redis = require('redis')
         legacyMode: true,
     })
     .on('connect', () => {
-        console.log(
-            `Key: ${redis_KEY}, [${today}][redis] connected`.bgMagenta.bold
-        );
-        console.log('Saving flights data to Redis...'.bgMagenta.bold);
+        console.log(`[${day}][redis] connected`.bgMagenta.bold);
     })
     .on('reconnecting', (p) =>
-        console.log(`[${today}][redis] reconnecting: %j`.magenta.bold, p)
+        console.log(`[${day}][redis] reconnecting: %j`.magenta.bold, p)
     )
-    .on('error', (e) =>
-        console.error(`[${today}][redis] error: %j`.red.bold, e)
-    );
-
-const TIMEZONE = 'Europe/Istanbul';
+    .on('error', (e) => console.error(`[${day}][redis] error: %j`.red.bold, e));
 
 const app = express();
 
+// Прописываю политику безопасности, путем добавления нового хедера
 app.use((req, res, next) => {
     res.setHeader(
         'Content-Security-Policy',
         `font-src 'self' data:; img-src 'self' data:; default-src 'self' http://localhost:${PORT}/`
     );
     next();
-});
+})
+    .get('/schedules', (req, res) => {
+        // /schedules - endpoint для получения расписания рейсов
+        redis.get(redis_KEY, (e, reply) => {
+            if (!reply)
+                return res.status(404).json({ error: 'Data not found' });
 
-app.listen(PORT, () => {
-    console.log(`Server started on port ${PORT}`.bgYellow.bold);
-});
+            try {
+                res.json(JSON.parse(reply));
+            } catch (e) {
+                res.status(500).json({ error: 'Internal Server Error' });
+            }
+        });
+    })
+    .listen(PORT, () => {
+        console.log(`Server started on port ${PORT}`.bgYellow.bold);
+    });
+
+const shutdownSignal = () => {
+    // Сигнал о завершении работы приложения
+    console.log('\nReceived kill signal, shutting down gracefully.');
+
+    redis && redis.end && redis.end(true);
+
+    setTimeout(() => {
+        console.error(
+            'Could not close connections in time, forcefully shutting down.'
+        );
+        return process.exit(1);
+    }, 9000);
+};
+process.once('SIGTERM', shutdownSignal); // listen for TERM signal .e.g. kill
+process.once('SIGINT', shutdownSignal); // listen for INT signal .e.g. Ctrl-C
 
 const agent = new HttpsProxyAgent(PROXY);
 const pageCount = 10;
 let flightsWithNewFields = [];
 
+let isLogOutput = false;
 axios.interceptors.request.use(
     (config) => {
-        console.log(`Making request to ${config.url} via proxy.`.bgCyan.bold);
+        if (!isLogOutput) {
+            console.log(
+                `Making request to ${config.url} via proxy.`.bgCyan.bold
+            );
+            isLogOutput = true;
+        }
         return config;
     },
     (error) => {
@@ -89,7 +120,7 @@ axios.interceptors.request.use(
     }
 );
 
-const generateRequestOptions = (pageNumber) => {
+const requestOptions = (pageNumber, date) => {
     return {
         method: 'POST',
         url: BASE_URL,
@@ -106,7 +137,7 @@ const generateRequestOptions = (pageNumber) => {
             pageNumber: pageNumber,
             pageSize: pageCount,
             isInternational: '1',
-            '': [`date=${today}`, `endDate=${tomorrow}`],
+            '': [`date=${date}`, `endDate=${date}`],
             culture: 'en',
             prevFlightPage: '0',
             clickedButton: 'moreFlight',
@@ -118,40 +149,50 @@ async.eachLimit(
     Array.from({ length: pageCount }, (_, i) => i + 1),
     20,
     (pageNumber, callback) => {
-        const options = generateRequestOptions(pageNumber);
-        let flightsWithNewFieldsPage;
+        // Using async.eachLimit to make requests for each date
+        async.eachLimit(
+            dates,
+            1, // Adjust the concurrency as needed
+            (date, callback) => {
+                const options = requestOptions(pageNumber, date);
+                let flightsNewFieldsPage;
 
-        axios
-            .request(options)
-            .then((response) => {
-                const flightsArray = response.data.result.data.flights;
-                flightsWithNewFieldsPage = flightsArray.map((flight) => ({
-                    ...flight,
-                    dep_checkin: null,
-                    aircraft_type: null,
-                    reg_number: null,
-                    page_number: pageNumber,
-                }));
-                flightsWithNewFields = flightsWithNewFields.concat(
-                    flightsWithNewFieldsPage
-                );
-                console.log(
-                    `Page ${pageNumber}:`.blue.bold,
-                    flightsWithNewFieldsPage
-                );
-                callback();
-            })
-            .catch((error) => {
-                console.error(
-                    `Error on page ${pageNumber}:`.red.bold,
-                    error.message
-                );
+                axios
+                    .request(options)
+                    .then((response) => {
+                        const flightsArray = response.data.result.data.flights;
+                        flightsNewFieldsPage = flightsArray.map((flight) => ({
+                            ...flight,
+                            dep_checkin: null,
+                            aircraft_type: null,
+                            reg_number: null,
+                            page_number: pageNumber,
+                        }));
+                        flightsWithNewFields =
+                            flightsWithNewFields.concat(flightsNewFieldsPage);
+                        console.log(
+                            `Page ${pageNumber}, Date ${date}:`.blue.bold,
+                            flightsNewFieldsPage
+                        );
+                        callback();
+                    })
+                    .catch((error) => {
+                        console.error(
+                            `Error on Page ${pageNumber}, Date ${date}:`.red
+                                .bold,
+                            error.message
+                        );
+                        callback(error);
+                    });
+            },
+            (error) => {
                 callback(error);
-            });
+            }
+        );
     },
-    (err) => {
-        if (err) {
-            console.error('Error:'.red.bold, err);
+    (error) => {
+        if (error) {
+            console.error('Error:'.red.bold, error);
         } else {
             console.log('All requests completed successfully.'.green.bold);
 
