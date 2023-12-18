@@ -6,7 +6,7 @@ const express = require('express');
 const moment = require('moment-timezone');
 
 const PORT = 3000;
-const BASE_URL =
+const base_url =
     'https://www.istairport.com/umbraco/api/FlightInfo/GetFlightStatusBoard';
 const HEADERS = {
     Accept: 'application/json, text/javascript, */*; q=0.01',
@@ -38,13 +38,12 @@ const TMZN = 'Europe/Istanbul';
 const day = moment().tz(TMZN);
 const dates = [day.format(FMT), day.clone().add(1, 'd').format(FMT)];
 
-const redis_URL = 'redis://localhost:6379';
-const redis_KEY = 'airports:istanbul';
+const redis_url = 'redis://localhost:6379';
+const redis_key = 'airports:istanbul';
 
 const redis = require('redis')
     .createClient({
-        url: redis_URL,
-        legacyMode: true,
+        url: redis_url,
     })
     .on('connect', () => {
         console.log(`[${day}][redis] connected`.bgMagenta.bold);
@@ -56,30 +55,32 @@ const redis = require('redis')
 
 const app = express();
 
-// Прописываю политику безопасности, путем добавления нового хедера
-app.use((req, res, next) => {
-    res.setHeader(
-        'Content-Security-Policy',
-        `font-src 'self' data:; img-src 'self' data:; default-src 'self' http://localhost:${PORT}/`
-    );
-    next();
-})
-    .get('/schedules', (req, res) => {
-        // /schedules - endpoint для получения расписания рейсов
-        redis.get(redis_KEY, (e, reply) => {
-            if (!reply)
-                return res.status(404).json({ error: 'Data not found' });
+app.get('/schedules', (req, res) => {
+    // http://localhost:3000/schedules - endpoint для получения расписания рейсов
+    redis.get(redis_key, (e, reply) => {
+        if (!reply) return res.status(404).json({ error: 'Data not found' });
 
-            try {
-                res.json(JSON.parse(reply));
-            } catch (e) {
-                res.status(500).json({ error: 'Internal Server Error' });
-            }
-        });
-    })
-    .listen(PORT, () => {
-        console.log(`Server started on port ${PORT}`.bgYellow.bold);
+        try {
+            res.json(JSON.parse(reply));
+        } catch (e) {
+            res.status(500).json({ error: 'Internal Server Error' });
+        }
     });
+});
+
+app.listen(PORT, () => {
+    console.log(`Server started on port ${PORT}`.bgYellow.bold);
+});
+
+// const setRedisData = (redis_key, data) => {
+//     redis.set(redis_key, 10, JSON.stringify(data), (err) => {
+//         if (err) {
+//             console.error(`[${day}][redis] set error: %j`.red.bold, err);
+//         } else {
+//             console.log(`[${day}][redis] data set successfully`.bgGreen.bold);
+//         }
+//     });
+// };
 
 const shutdownSignal = () => {
     // Сигнал о завершении работы приложения
@@ -123,9 +124,10 @@ axios.interceptors.request.use(
 const requestOptions = (pageNumber, date) => {
     return {
         method: 'POST',
-        url: BASE_URL,
+        url: base_url,
         headers: {
             ...HEADERS,
+            'Content-Security-Policy': `font-src 'self' data:; img-src 'self' data:; default-src 'self' http://localhost:${PORT}/`,
             'Proxy-Authorization': `Basic ${Buffer.from(
                 `${PROXY_USERNAME}:${PROXY_PASSWORD}`
             ).toString('base64')}`,
@@ -174,6 +176,7 @@ async.eachLimit(
                             `Page ${pageNumber}, Date ${date}:`.blue.bold,
                             flightsNewFieldsPage
                         );
+                        // setRedisData(redis_key, flightsWithNewFields);
                         callback();
                     })
                     .catch((error) => {

@@ -13,23 +13,14 @@
   "dependencies": {
     "async": "^3.2.5",
     "axios": "^1.6.2",
-    "cheerio": "^1.0.0-rc.12",
-    "colors": "^1.4.0",
-    "cors": "^2.8.5",
     "express": "^4.18.2",
-    "express-http-proxy": "^2.0.0",
     "https-proxy-agent": "^7.0.2",
     "lodash": "^4.17.21",
     "moment-timezone": "^0.5.43",
-    "node-fetch": "^3.3.2",
-    "nodemon": "^3.0.2",
-    "redis": "^4.6.11",
-    "request": "^2.88.2"
-  },
-  "exports": {
-    "./lib/api/traversing": "./lib/api/traversing.js"
+    "redis": "^4.6.11"
   },
   "devDependencies": {
-    "morgan": "^1.10.0"
+    "colors": "^1.4.0",
+    "nodemon": "^3.0.2"
   }
 }
