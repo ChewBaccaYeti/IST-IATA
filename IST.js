@@ -1,14 +1,13 @@
 const async = require('async');
-const axios = require('axios').default;
-const { HttpsProxyAgent } = require('https-proxy-agent');
+const request = require('request');
 const colors = require('colors').default;
 const express = require('express');
 const moment = require('moment-timezone');
 
-const PORT = 3000;
-const base_url =
+const port = 3000;
+const base_URL =
     'https://www.istairport.com/umbraco/api/FlightInfo/GetFlightStatusBoard';
-const HEADERS = {
+const headers = {
     Accept: 'application/json, text/javascript, */*; q=0.01',
     'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
     Connection: 'keep-alive',
@@ -28,25 +27,23 @@ const HEADERS = {
     'sec-ch-ua-mobile': '?0',
     'sec-ch-ua-platform': '^^Windows^^',
 };
-
-const PROXY_USERNAME = 'iydv9uop';
-const PROXY_PASSWORD = '7rSHfY6iR6dBQRnX';
-const PROXY = `http://${PROXY_USERNAME}:${PROXY_PASSWORD}@proxy.proxy-cheap.com:31112`;
-
+const proxy = 'http://speej9xhkw:KbdCbB22xmdmxpG28k@dc.smartproxy.com:10000';
 const FMT = 'YYYY-MM-DD HH:mm';
 const TMZN = 'Europe/Istanbul';
 const day = moment().tz(TMZN);
 const dates = [day.format(FMT), day.clone().add(1, 'd').format(FMT)];
 
-const redis_url = 'redis://localhost:6379';
-const redis_key = 'airports:istanbul';
+const redis_URL = 'redis://127.0.0.1:6379';
+const redis_KEY = 'airports:istanbul';
 
 const redis = require('redis')
     .createClient({
-        url: redis_url,
+        url: redis_URL,
     })
     .on('connect', () => {
         console.log(`[${day}][redis] connected`.bgMagenta.bold);
+
+        run();
     })
     .on('reconnecting', (p) =>
         console.log(`[${day}][redis] reconnecting: %j`.magenta.bold, p)
@@ -57,7 +54,7 @@ const app = express();
 
 app.get('/schedules', (req, res) => {
     // http://localhost:3000/schedules - endpoint для получения расписания рейсов
-    redis.get(redis_key, (e, reply) => {
+    redis.get(redis_KEY, (e, reply) => {
         if (!reply) return res.status(404).json({ error: 'Data not found' });
 
         try {
@@ -66,21 +63,20 @@ app.get('/schedules', (req, res) => {
             res.status(500).json({ error: 'Internal Server Error' });
         }
     });
+}).listen(port, () => {
+    console.log(`Server started on port ${port}`.bgYellow.bold);
 });
 
-app.listen(PORT, () => {
-    console.log(`Server started on port ${PORT}`.bgYellow.bold);
-});
-
-// const setRedisData = (redis_key, data) => {
-//     redis.set(redis_key, 10, JSON.stringify(data), (err) => {
-//         if (err) {
-//             console.error(`[${day}][redis] set error: %j`.red.bold, err);
-//         } else {
-//             console.log(`[${day}][redis] data set successfully`.bgGreen.bold);
-//         }
-//     });
-// };
+const setRedisData = (redis_KEY, data, callback) => {
+    redis.set(redis_KEY, JSON.stringify(data), (err) => {
+        if (err) {
+            console.error(`[${day}][redis] set error: %j`.red.bold, err);
+        } else {
+            console.log(`[${day}][redis] data set successfully`.magenta.bold);
+        }
+        callback && callback();
+    });
+};
 
 const shutdownSignal = () => {
     // Сигнал о завершении работы приложения
@@ -98,70 +94,71 @@ const shutdownSignal = () => {
 process.once('SIGTERM', shutdownSignal); // listen for TERM signal .e.g. kill
 process.once('SIGINT', shutdownSignal); // listen for INT signal .e.g. Ctrl-C
 
-const agent = new HttpsProxyAgent(PROXY);
-const pageCount = 10;
+const pageCount = 11;
 let flightsWithNewFields = [];
 
-let isLogOutput = false;
-axios.interceptors.request.use(
-    (config) => {
-        if (!isLogOutput) {
-            console.log(
-                `Making request to ${config.url} via proxy.`.bgCyan.bold
-            );
-            isLogOutput = true;
-        }
-        return config;
-    },
-    (error) => {
-        console.error(
-            `Error in request interceptor: ${error.message}`.red.bold
-        );
-        return Promise.reject(error);
-    }
-);
+function run() {
+    async.eachLimit(
+        Array.from({ length: 11 }, (_, i) => i + 1),
+        20,
+        (pageNumber, next_page) => {
+            // Using async.eachLimit to make requests for each date
+            async.eachLimit(
+                dates,
+                1, // Adjust the concurrency as needed
+                (date, next_date) => {
+                    //const options = requestOptions(pageNumber, date);
+                    let flightsNewFieldsPage;
 
-const requestOptions = (pageNumber, date) => {
-    return {
-        method: 'POST',
-        url: base_url,
-        headers: {
-            ...HEADERS,
-            'Content-Security-Policy': `font-src 'self' data:; img-src 'self' data:; default-src 'self' http://localhost:${PORT}/`,
-            'Proxy-Authorization': `Basic ${Buffer.from(
-                `${PROXY_USERNAME}:${PROXY_PASSWORD}`
-            ).toString('base64')}`,
-        },
-        httpAgent: agent,
-        data: {
-            nature: '1',
-            searchTerm: 'changeflight',
-            pageNumber: pageNumber,
-            pageSize: pageCount,
-            isInternational: '1',
-            '': [`date=${date}`, `endDate=${date}`],
-            culture: 'en',
-            prevFlightPage: '0',
-            clickedButton: 'moreFlight',
-        },
-    };
-};
+                    request.post(
+                        base_URL,
+                        {
+                            proxy,
+                            headers,
+                            formData: {
+                                nature: '1',
+                                searchTerm: 'changeflight',
+                                pageNumber: pageNumber,
+                                pageSize: 11,
+                                isInternational: '1',
+                                '': [`date=${date}`, `endDate=${date}`],
+                                culture: 'en',
+                                prevFlightPage: '0',
+                                clickedButton: 'moreFlight',
+                            },
+                        },
 
-async.eachLimit(
-    Array.from({ length: pageCount }, (_, i) => i + 1),
-    20,
-    (pageNumber, callback) => {
-        // Using async.eachLimit to make requests for each date
-        async.eachLimit(
-            dates,
-            1, // Adjust the concurrency as needed
-            (date, callback) => {
-                const options = requestOptions(pageNumber, date);
-                let flightsNewFieldsPage;
+                        (error, response, body) => {
+                            console.log(body);
 
+                            if (!body) return next_date();
+
+                            const obj = JSON.parse(body);
+
+                            const flightsArray = obj.result.data.flights;
+                            flightsNewFieldsPage = flightsArray.map(
+                                (flight) => ({
+                                    ...flight,
+                                    dep_checkin: null,
+                                    aircraft_type: null,
+                                    reg_number: null,
+                                    page_number: pageNumber,
+                                })
+                            );
+                            flightsWithNewFields.push(...flightsNewFieldsPage);
+                            /* console.log(
+                            `Page ${pageNumber}, Date ${date}: %j`.blue.bold,
+                            flightsNewFieldsPage[0]
+                        ); */
+                            next_date();
+                        }
+                    );
+                    /*
                 axios
                     .request(options)
                     .then((response) => {
+                        console.log('response: %j', response.data);
+                        return;
                         const flightsArray = response.data.result.data.flights;
                         flightsNewFieldsPage = flightsArray.map((flight) => ({
                             ...flight,
@@ -170,13 +167,12 @@ async.eachLimit(
                             reg_number: null,
                             page_number: pageNumber,
                         }));
-                        flightsWithNewFields =
-                            flightsWithNewFields.concat(flightsNewFieldsPage);
+                        flightsWithNewFields.push(...flightsNewFieldsPage);
                         console.log(
-                            `Page ${pageNumber}, Date ${date}:`.blue.bold,
-                            flightsNewFieldsPage
+                            `Page ${pageNumber}, Date ${date}: %j`.blue.bold,
+                            flightsNewFieldsPage[0]
                         );
-                        // setRedisData(redis_key, flightsWithNewFields);
+
                         callback();
                     })
                     .catch((error) => {
@@ -187,22 +183,30 @@ async.eachLimit(
                         );
                         callback(error);
                     });
-            },
-            (error) => {
-                callback(error);
-            }
-        );
-    },
-    (error) => {
-        if (error) {
-            console.error('Error:'.red.bold, error);
-        } else {
-            console.log('All requests completed successfully.'.green.bold);
-
-            console.log(
-                `Proxy is configured and requests were made via proxy: ${PROXY}`
-                    .cyan.bold
+                    */
+                },
+                (error) => {
+                    next_page(error);
+                }
             );
+        },
+        (error) => {
+            if (error) {
+                console.error('Error:'.red.bold, error);
+            } else {
+                console.log('All requests completed successfully.'.green.bold);
+                console.log(
+                    `Proxy is configured and requests were made via proxy: ${proxy}`
+                        .cyan.bold
+                );
+            }
+
+            setRedisData(redis_KEY, flightsWithNewFields, () => {
+                console.log(
+                    `[${day}][redis] data saved in Redis successfully.`.magenta
+                        .bold
+                );
+            });
         }
-    }
-);
+    );
+}

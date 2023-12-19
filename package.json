@@ -17,7 +17,8 @@
     "https-proxy-agent": "^7.0.2",
     "lodash": "^4.17.21",
     "moment-timezone": "^0.5.43",
-    "redis": "^4.6.11"
+    "redis": "^3.0.2",
+    "request": "^2.88.2"
   },
   "devDependencies": {
     "colors": "^1.4.0",
