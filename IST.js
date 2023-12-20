@@ -94,119 +94,122 @@ const shutdownSignal = () => {
 process.once('SIGTERM', shutdownSignal); // listen for TERM signal .e.g. kill
 process.once('SIGINT', shutdownSignal); // listen for INT signal .e.g. Ctrl-C
 
-const pageCount = 11;
-let flightsWithNewFields = [];
+const min_pageSize = 10;
+const max_pageSize = 50;
+let new_FlightsArray = [];
 
 function run() {
     async.eachLimit(
-        Array.from({ length: 11 }, (_, i) => i + 1),
+        Array.from({ length: max_pageSize }, (_, i) => i + 1),
         20,
         (pageNumber, next_page) => {
-            // Using async.eachLimit to make requests for each date
+            // Using async.eachLimit to make requests for each date in parallel to not overload the server
             async.eachLimit(
                 dates,
-                1, // Adjust the concurrency as needed
+                1, // Adjust the concurrency as needed for date, one by one in order to not overload the server
                 (date, next_date) => {
-                    //const options = requestOptions(pageNumber, date);
-                    let flightsNewFieldsPage;
+                    let new_fieldsFlights;
 
-                    request.post(
-                        base_URL,
-                        {
-                            proxy,
-                            headers,
-                            formData: {
-                                nature: '1',
-                                searchTerm: 'changeflight',
-                                pageNumber: pageNumber,
-                                pageSize: 11,
-                                isInternational: '1',
-                                '': [`date=${date}`, `endDate=${date}`],
-                                culture: 'en',
-                                prevFlightPage: '0',
-                                clickedButton: 'moreFlight',
-                            },
-                        },
+                    let page = 0;
+                    let tries = 0;
+                    const max_retries = 3;
+                    const url = `${base_URL}/en/flights/flight-info/departure-flights/?date=${date}&offset=${
+                        page * max_pageSize
+                    }`;
 
-                        (error, response, body) => {
-                            console.log(body);
+                    async.retry(
+                        max_retries,
+                        (done) => {
+                            if (tries)
+                                console.log(`[retrying#${tries}] ${url}`);
+                            tries++;
 
-                            if (!body) return next_date();
+                            request.post(
+                                base_URL,
+                                {
+                                    proxy,
+                                    headers,
+                                    formData: {
+                                        nature: '1',
+                                        searchTerm: 'changeflight',
+                                        pageNumber: pageNumber,
+                                        pageSize: 11,
+                                        isInternational: '1',
+                                        '': [`date=${date}`, `endDate=${date}`],
+                                        culture: 'en',
+                                        prevFlightPage: '0',
+                                        clickedButton: 'moreFlight',
+                                    },
+                                },
+                                (error, response, body) => {
+                                    if (
+                                        error ||
+                                        !body ||
+                                        body.length < min_pageSize
+                                    ) {
+                                        console.error('Error:'.red.bold, error),
+                                            done(true);
+                                    } else {
+                                        console.log(
+                                            'Request completed successfully.'
+                                                .green.bold
+                                        );
+                                        console.log(
+                                            `Proxy is configured and request were made via proxy: ${proxy}`
+                                                .cyan.bold
+                                        );
+                                    }
 
-                            const obj = JSON.parse(body);
+                                    const obj = JSON.parse(body);
+                                    // console.log(obj);
 
-                            const flightsArray = obj.result.data.flights;
-                            flightsNewFieldsPage = flightsArray.map(
-                                (flight) => ({
-                                    ...flight,
-                                    dep_checkin: null,
-                                    aircraft_type: null,
-                                    reg_number: null,
-                                    page_number: pageNumber,
-                                })
+                                    const flightsArray =
+                                        obj.result.data.flights;
+                                    new_fieldsFlights = flightsArray.map(
+                                        (flight) => ({
+                                            ...flight,
+                                            dep_checkin: null,
+                                            aircraft_type: null,
+                                            reg_number: null,
+                                            page_number: pageNumber,
+                                        })
+                                    );
+                                    new_FlightsArray.push(...new_fieldsFlights);
+                                    console.log(
+                                        `Page ${pageNumber}, Date ${date}`.blue
+                                            .bold,
+                                        new_fieldsFlights
+                                    );
+                                    done();
+                                },
+                                () => {
+                                    next_date();
+                                }
                             );
-                            flightsWithNewFields.push(...flightsNewFieldsPage);
-                            /* console.log(
-                            `Page ${pageNumber}, Date ${date}: %j`.blue.bold,
-                            flightsNewFieldsPage[0]
-                        ); */
-                            next_date();
+                        },
+                        () => {
+                            page++;
+                            next_page();
                         }
                     );
-                    /*
-                axios
-                    .request(options)
-                    .then((response) => {
-                        console.log('response: %j', response.data);
-                        return;
-                        const flightsArray = response.data.result.data.flights;
-                        flightsNewFieldsPage = flightsArray.map((flight) => ({
-                            ...flight,
-                            dep_checkin: null,
-                            aircraft_type: null,
-                            reg_number: null,
-                            page_number: pageNumber,
-                        }));
-                        flightsWithNewFields.push(...flightsNewFieldsPage);
-                        console.log(
-                            `Page ${pageNumber}, Date ${date}: %j`.blue.bold,
-                            flightsNewFieldsPage[0]
-                        );
-
-                        callback();
-                    })
-                    .catch((error) => {
-                        console.error(
-                            `Error on Page ${pageNumber}, Date ${date}:`.red
-                                .bold,
-                            error.message
-                        );
-                        callback(error);
-                    });
-                    */
-                },
-                (error) => {
-                    next_page(error);
                 }
             );
-        },
-        (error) => {
-            if (error) {
-                console.error('Error:'.red.bold, error);
-            } else {
-                console.log('All requests completed successfully.'.green.bold);
-                console.log(
-                    `Proxy is configured and requests were made via proxy: ${proxy}`
-                        .cyan.bold
-                );
-            }
-
-            setRedisData(redis_KEY, flightsWithNewFields, () => {
-                console.log(
-                    `[${day}][redis] data saved in Redis successfully.`.magenta
-                        .bold
-                );
-            });
         }
     );
 }
+
+setRedisData(redis_KEY, new_FlightsArray, () => {
+    console.log(
+        `[${day}][redis] data saved in Redis successfully.`.magenta.bold
+    );
+});
+
+// if (error) {
+//     console.error('Error:'.red.bold, error);
+// } else {
+//     console.log('Request completed successfully.'.green.bold);
+//     console.log(
+//         `Proxy is configured and request were made via proxy: ${proxy}`.cyan
+//             .bold
+//     );
+// }

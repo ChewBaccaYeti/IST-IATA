@@ -203,7 +203,7 @@ const list = () => {
     async.each(
         ['departures', 'arrivals'],
         (type, next_type) => {
-            // так же запускаем параллельно что бы ускорить
+            // так же запускаем параллельно, что бы ускорить
             async.each(
                 dates,
                 (date, next_date) => {
