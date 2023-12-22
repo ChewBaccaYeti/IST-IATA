@@ -66,8 +66,8 @@ app.get('/schedules', (req, res) => {
     console.log(`Server started on port ${port}`.bgYellow.bold);
 });
 
-const setRedisData = (redis_KEY, data, callback) => {
-    redis.set(redis_KEY, JSON.stringify(data), (err) => {
+const setRedisData = (redis_KEY, new_FlightsArray, callback) => {
+    redis.set(redis_KEY, JSON.stringify(new_FlightsArray), (err) => {
         if (err) {
             console.error(`[${day}][redis] set error: %j`.red.bold, err);
         } else {
@@ -96,35 +96,30 @@ process.once('SIGINT', shutdownSignal); // listen for INT signal .e.g. Ctrl-C
 const min_pageSize = 11;
 const max_pageSize = 45;
 const max_retries = 3;
+const retry_interval = 3000;
 let new_FlightsArray = [];
-let json_FlightsArray = [];
 
 function run() {
     async.eachLimit(
         Array.from({ length: max_pageSize }, (_, i) => i + 1),
         20,
-        (pageNumber, next_page) => {
-            async.each(dates, (date, next_date) => {
+        function (pageNumber, next_page) {
+            async.each(dates, function (date, next_date) {
                 let new_fieldsFlights;
-                let page = 0;
-                let tries = 0;
 
+                let tries = 0;
                 async.retry(
-                    {
-                        times: max_retries,
-                        interval: 3000,
-                        errorFilter: (err) => err.code === 'ETIMEDOUT',
-                    },
-                    (done) => {
-                        const url = `${base_URL}/en/flights/flight-info/departure-flights/?date=${date}&offset=${
-                            page * max_pageSize
-                        }`;
-                        if (tries) console.log(`[retrying#${tries}] ${url}`);
+                    { times: max_retries, interval: retry_interval },
+                    function (done) {
+                        if (tries)
+                            console.log(
+                                `[retrying#${tries}] ${base_URL}`.yellow.bold
+                            );
                         tries++;
 
                         request.post(
-                            base_URL,
                             {
+                                url: base_URL,
                                 proxy,
                                 headers,
                                 formData: {
@@ -139,62 +134,60 @@ function run() {
                                     clickedButton: 'moreFlight',
                                 },
                             },
-                            (error, response, body) => {
+                            function (error, response, body) {
                                 if (
                                     error ||
                                     !body ||
                                     body.length < min_pageSize
-                                ) {
-                                    console.error('Error:'.red.bold, error);
-                                    done(error); // Прекращаем повторы при ошибке
-                                } else {
-                                    const obj = JSON.parse(body);
-                                    const flightsArray =
-                                        obj.result.data.flights;
-                                    new_fieldsFlights = flightsArray.map(
-                                        (flight) => ({
-                                            ...flight,
-                                            dep_checkin: null,
-                                            aircraft_type: null,
-                                            reg_number: null,
-                                            page_number: pageNumber,
-                                        })
-                                    );
-                                    new_FlightsArray.push(...new_fieldsFlights);
-                                    json_FlightsArray =
-                                        JSON.stringify(new_FlightsArray);
+                                )
+                                    return done(true);
 
-                                    console.log(
-                                        `Page ${pageNumber}, Date ${date}`.blue
-                                            .bold,
-                                        new_FlightsArray
-                                    );
-                                    console.log(
-                                        'Request completed successfully.'.green
-                                            .bold
-                                    );
-                                    console.log(
-                                        `Proxy is configured and request were made via proxy: ${proxy}`
-                                            .cyan.bold
-                                    );
-                                    done(null, new_fieldsFlights); // Завершаем повторы при успешном выполнении
-                                }
+                                const obj = JSON.parse(body);
+                                const flightsArray = obj.result.data.flights;
+
+                                new_fieldsFlights = flightsArray.map(
+                                    (flight) => ({
+                                        ...flight,
+                                        dep_checkin: null,
+                                        aircraft_type: null,
+                                        reg_number: null,
+                                        page_number: pageNumber,
+                                    })
+                                );
+
+                                new_FlightsArray.push(...new_fieldsFlights);
+
+                                console.log(
+                                    `Page ${pageNumber}, Date ${date}`.blue
+                                        .bold,
+                                    new_FlightsArray
+                                );
+                                console.log(
+                                    'Request completed successfully.'.green.bold
+                                );
+                                console.log(
+                                    `Proxy is configured and request were made via proxy: ${proxy}`
+                                        .cyan.bold
+                                );
+                                done();
+
+                                setRedisData(
+                                    redis_KEY,
+                                    new_FlightsArray,
+                                    () => {
+                                        console.log(
+                                            `[${day}][redis] data saved in Redis successfully.`
+                                                .magenta.bold
+                                        );
+                                    }
+                                );
                             }
                         );
-                    },
-                    (err, result) => {
-                        // Логика после успешного выполнения
-                        next_date();
                     }
                 );
+                next_date();
             });
             next_page();
         }
     );
 }
-
-setRedisData(redis_KEY, json_FlightsArray, () => {
-    console.log(
-        `[${day}][redis] data saved in Redis successfully.`.magenta.bold
-    );
-});
