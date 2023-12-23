@@ -7,6 +7,7 @@ const moment = require('moment-timezone');
 const port = 3000;
 const base_URL =
     'https://www.istairport.com/umbraco/api/FlightInfo/GetFlightStatusBoard';
+// Убрал лишние хедеры, которые после проверки запуском не играли роли, судя по ответу
 const headers = {
     Accept: 'application/json, text/javascript, */*; q=0.01',
     'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
@@ -31,7 +32,7 @@ const redis = require('redis')
     })
     .on('connect', () => {
         console.log(`[${day}][redis] connected`.magenta.bold);
-        run();
+        dataFlights(); // Вызов основной функции во время подкючения Редиса
     })
     .on('reconnecting', (p) =>
         console.log(`[${day}][redis] reconnecting: %j`.magenta.bold, p)
@@ -55,6 +56,7 @@ app.get('/schedules', (req, res) => {
     console.log(`Server started on port ${port}`.bgYellow.bold);
 });
 
+// Функция для работы с редисом, которая  принимает основной код и фильтрацию домашних и международних рейсов, путём добавления соответсвующего флага к последним
 const setRedisData = (redis_KEY, new_FlightsArray, callback) => {
     const internationalFlights = new_FlightsArray.filter(
         (flight) => flight.isInternational === 1
@@ -121,18 +123,20 @@ const shutdownSignal = () => {
 process.once('SIGTERM', shutdownSignal); // listen for TERM signal .e.g. kill
 process.once('SIGINT', shutdownSignal); // listen for INT signal .e.g. Ctrl-C
 
-function run() {
+function dataFlights() {
     const min_pageSize = 11;
     const max_pageSize = 45;
     const max_retries = 3;
     const retry_interval = 3000;
     let new_FlightsArray = [];
     let finished = false;
+    // последняя переменная пока не используется потому что я еще не придумал как прописать until
 
     async.eachLimit(
         Array.from({ length: max_pageSize }, (_, i) => i + 1),
         20,
         function (pageNumber, next_page) {
+            // Использую async.eachSeries чтобы прогонять асинхронные функции по одной
             async.eachSeries(
                 [0, 1],
                 function (status, next_status) {
@@ -179,6 +183,7 @@ function run() {
                                                 },
                                             },
                                             function (error, response, body) {
+                                                // В случае ошибки, отсутствия данных или слишком мало данных, то пробуем ещё раз
                                                 if (
                                                     error ||
                                                     !body ||
@@ -188,6 +193,7 @@ function run() {
 
                                                 const obj = JSON.parse(body);
 
+                                                // В случае если данные не парсятся или не приходит ответ
                                                 if (
                                                     !obj.result ||
                                                     !obj.result.data
@@ -195,6 +201,7 @@ function run() {
                                                     return done(true);
                                                 }
 
+                                                //  Массив-родитель
                                                 const flightsArray =
                                                     obj.result.data.flights;
 
@@ -209,11 +216,12 @@ function run() {
                                                                 pageNumber,
                                                         })
                                                     );
-
+                                                // Конечный результат, массив данных после прогонки и парсинга с мапингом
                                                 new_FlightsArray.push(
                                                     ...new_fieldsFlights
                                                 );
 
+                                                // Вывожу в консоль рузультаты для наглядности, потом сотру логи
                                                 console.log(
                                                     `Page ${pageNumber}, Date ${date}, Type ${type}, isInternational ${status}`
                                                         .blue.bold,
@@ -229,6 +237,7 @@ function run() {
                                                 );
                                                 done();
 
+                                                // Сохраняю данные в Redis
                                                 setRedisData(
                                                     redis_KEY,
                                                     new_FlightsArray,
