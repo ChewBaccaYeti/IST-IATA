@@ -41,7 +41,7 @@ const redis = require('redis')
         url: redis_URL,
     })
     .on('connect', () => {
-        console.log(`[${day}][redis] connected`.bgMagenta.bold);
+        console.log(`[${day}][redis] connected`.magenta.bold);
         run();
     })
     .on('reconnecting', (p) =>
@@ -66,15 +66,65 @@ app.get('/schedules', (req, res) => {
     console.log(`Server started on port ${port}`.bgYellow.bold);
 });
 
+// const setRedisData = (redis_KEY, new_FlightsArray, callback) => {
+//     redis.set(redis_KEY, JSON.stringify(new_FlightsArray), (err) => {
+//         if (err) {
+//             console.error(`[${day}][redis] set error: %j`.red.bold, err);
+//         } else {
+//             console.log(`[${day}][redis] data set successfully`.magenta.bold);
+//         }
+//         callback && callback();
+//     });
+// };
+
 const setRedisData = (redis_KEY, new_FlightsArray, callback) => {
-    redis.set(redis_KEY, JSON.stringify(new_FlightsArray), (err) => {
-        if (err) {
-            console.error(`[${day}][redis] set error: %j`.red.bold, err);
-        } else {
-            console.log(`[${day}][redis] data set successfully`.magenta.bold);
+    const internationalFlights = new_FlightsArray.filter(
+        (flight) => flight.isInternational === 1
+    );
+
+    const domesticFlights = new_FlightsArray.filter(
+        (flight) => flight.isInternational === 0
+    );
+
+    redis.set(
+        `${redis_KEY}:international`,
+        JSON.stringify(internationalFlights),
+        (err) => {
+            if (err) {
+                console.error(
+                    `[${day}][redis] set error for international flights: %j`
+                        .red.bold,
+                    err
+                );
+            } else {
+                console.log(
+                    `[${day}][redis] International flights data set successfully`
+                        .magenta.bold
+                );
+            }
         }
-        callback && callback();
-    });
+    );
+
+    redis.set(
+        `${redis_KEY}:domestic`,
+        JSON.stringify(domesticFlights),
+        (err) => {
+            if (err) {
+                console.error(
+                    `[${day}][redis] set error for domestic flights: %j`.red
+                        .bold,
+                    err
+                );
+            } else {
+                console.log(
+                    `[${day}][redis] Domestic flights data set successfully`
+                        .magenta.bold
+                );
+            }
+
+            callback && callback();
+        }
+    );
 };
 
 const shutdownSignal = () => {
@@ -93,101 +143,137 @@ const shutdownSignal = () => {
 process.once('SIGTERM', shutdownSignal); // listen for TERM signal .e.g. kill
 process.once('SIGINT', shutdownSignal); // listen for INT signal .e.g. Ctrl-C
 
-const min_pageSize = 11;
-const max_pageSize = 45;
-const max_retries = 3;
-const retry_interval = 3000;
-let new_FlightsArray = [];
-
 function run() {
+    const min_pageSize = 11;
+    const max_pageSize = 45;
+    const max_retries = 3;
+    const retry_interval = 3000;
+    let new_FlightsArray = [];
+    let finished = false;
+
     async.eachLimit(
         Array.from({ length: max_pageSize }, (_, i) => i + 1),
         20,
         function (pageNumber, next_page) {
-            async.each(dates, function (date, next_date) {
-                let new_fieldsFlights;
+            async.eachSeries(
+                [0, 1],
+                function (status, next_status) {
+                    async.eachSeries([0, 1], function (type, next_type) {
+                        // заменил async.each на async.eachSeries
+                        async.each(
+                            dates,
+                            function (date, next_date) {
+                                let new_fieldsFlights;
 
-                let tries = 0;
-                async.retry(
-                    { times: max_retries, interval: retry_interval },
-                    function (done) {
-                        if (tries)
-                            console.log(
-                                `[retrying#${tries}] ${base_URL}`.yellow.bold
-                            );
-                        tries++;
+                                let tries = 0;
+                                async.retry(
+                                    {
+                                        times: max_retries,
+                                        interval: retry_interval,
+                                    },
+                                    function (done) {
+                                        if (tries)
+                                            console.log(
+                                                `[retrying#${tries}] ${base_URL}`
+                                                    .yellow.bold
+                                            );
+                                        tries++;
 
-                        request.post(
-                            {
-                                url: base_URL,
-                                proxy,
-                                headers,
-                                formData: {
-                                    nature: '1',
-                                    searchTerm: 'changeflight',
-                                    pageNumber,
-                                    pageSize: max_pageSize,
-                                    isInternational: '1',
-                                    '': [`date=${date}`, `endDate=${date}`],
-                                    culture: 'en',
-                                    prevFlightPage: '0',
-                                    clickedButton: 'moreFlight',
-                                },
-                            },
-                            function (error, response, body) {
-                                if (
-                                    error ||
-                                    !body ||
-                                    body.length < min_pageSize
-                                )
-                                    return done(true);
+                                        request.post(
+                                            {
+                                                url: base_URL,
+                                                proxy,
+                                                headers,
+                                                formData: {
+                                                    pageSize: max_pageSize,
+                                                    pageNumber,
+                                                    flightNature: status,
+                                                    nature: type,
+                                                    isInternational: status,
+                                                    '': [
+                                                        `date=${date}`,
+                                                        `endDate=${date}`,
+                                                    ],
+                                                    searchTerm: 'changeflight',
+                                                    culture: 'en',
+                                                    prevFlightPage: '0',
+                                                    clickedButton: 'moreFlight',
+                                                },
+                                            },
+                                            function (error, response, body) {
+                                                if (
+                                                    error ||
+                                                    !body ||
+                                                    body.length < min_pageSize
+                                                )
+                                                    return done(true);
 
-                                const obj = JSON.parse(body);
-                                const flightsArray = obj.result.data.flights;
+                                                const obj = JSON.parse(body);
 
-                                new_fieldsFlights = flightsArray.map(
-                                    (flight) => ({
-                                        ...flight,
-                                        dep_checkin: null,
-                                        aircraft_type: null,
-                                        reg_number: null,
-                                        page_number: pageNumber,
-                                    })
-                                );
+                                                if (
+                                                    !obj.result ||
+                                                    !obj.result.data
+                                                ) {
+                                                    return done(true);
+                                                }
 
-                                new_FlightsArray.push(...new_fieldsFlights);
+                                                const flightsArray =
+                                                    obj.result.data.flights;
 
-                                console.log(
-                                    `Page ${pageNumber}, Date ${date}`.blue
-                                        .bold,
-                                    new_FlightsArray
-                                );
-                                console.log(
-                                    'Request completed successfully.'.green.bold
-                                );
-                                console.log(
-                                    `Proxy is configured and request were made via proxy: ${proxy}`
-                                        .cyan.bold
-                                );
-                                done();
+                                                new_fieldsFlights =
+                                                    flightsArray.map(
+                                                        (flight) => ({
+                                                            ...flight,
+                                                            dep_checkin: null,
+                                                            aircraft_type: null,
+                                                            reg_number: null,
+                                                            page_number:
+                                                                pageNumber,
+                                                        })
+                                                    );
 
-                                setRedisData(
-                                    redis_KEY,
-                                    new_FlightsArray,
-                                    () => {
-                                        console.log(
-                                            `[${day}][redis] data saved in Redis successfully.`
-                                                .magenta.bold
+                                                new_FlightsArray.push(
+                                                    ...new_fieldsFlights
+                                                );
+
+                                                console.log(
+                                                    `Page ${pageNumber}, Date ${date}`
+                                                        .blue.bold,
+                                                    new_FlightsArray
+                                                );
+                                                console.log(
+                                                    'Request completed successfully.'
+                                                        .green.bold
+                                                );
+                                                console.log(
+                                                    `Proxy is configured and request were made via proxy: ${proxy}`
+                                                        .cyan.bold
+                                                );
+                                                done();
+
+                                                setRedisData(
+                                                    redis_KEY,
+                                                    new_FlightsArray,
+                                                    () => {
+                                                        console.log(
+                                                            `[${day}][redis] data saved in Redis successfully.`
+                                                                .magenta.bold
+                                                        );
+                                                    }
+                                                );
+                                            }
                                         );
                                     }
                                 );
-                            }
+                                next_date();
+                            },
+                            next_type
                         );
-                    }
-                );
-                next_date();
-            });
-            next_page();
+                    });
+                    next_status();
+                },
+                next_page
+            );
         }
     );
 }
