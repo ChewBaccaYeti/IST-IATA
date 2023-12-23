@@ -9,23 +9,12 @@ const base_URL =
     'https://www.istairport.com/umbraco/api/FlightInfo/GetFlightStatusBoard';
 const headers = {
     Accept: 'application/json, text/javascript, */*; q=0.01',
-    'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
-    Connection: 'keep-alive',
     'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-    Cookie: '_gid=GA1.2.71353474.1702211813; _tt_enable_cookie=1; _ttp=xHAyXcBhbyteIoU2ncI_HxvtGOk; _gcl_au=1.1.1202715006.1702211813; _fbp=fb.1.1702377723947.286767234; iga_bid=MDMAAAEA9GgnCQAAAACVPtCkU194ZQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABgnK4NbB2b11gnu4AkaqHloFvxp; _ga_2KDDX4ZQVX=GS1.1.1702387577.9.1.1702387581.0.0.0; _gat_gtag_UA_129306132_1=1; _ga=GA1.1.1547759267.1702211813; _ga_V39SG6FNFF=GS1.1.1702387577.8.1.1702387581.56.0.0',
-    DNT: '1',
     Origin: 'https://www.istairport.com',
     Referer:
         'https://www.istairport.com/en/flights/flight-info/departure-flights/?locale=en',
-    'Sec-Fetch-Dest': 'empty',
-    'Sec-Fetch-Mode': 'cors',
-    'Sec-Fetch-Site': 'same-origin',
     'User-Agent':
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'X-Requested-With': 'XMLHttpRequest',
-    'sec-ch-ua': '^^Not_A',
-    'sec-ch-ua-mobile': '?0',
-    'sec-ch-ua-platform': '^^Windows^^',
 };
 const proxy = 'http://speej9xhkw:KbdCbB22xmdmxpG28k@dc.smartproxy.com:10000';
 const FMT = 'YYYY-MM-DD HH:mm';
@@ -65,17 +54,6 @@ app.get('/schedules', (req, res) => {
 }).listen(port, () => {
     console.log(`Server started on port ${port}`.bgYellow.bold);
 });
-
-// const setRedisData = (redis_KEY, new_FlightsArray, callback) => {
-//     redis.set(redis_KEY, JSON.stringify(new_FlightsArray), (err) => {
-//         if (err) {
-//             console.error(`[${day}][redis] set error: %j`.red.bold, err);
-//         } else {
-//             console.log(`[${day}][redis] data set successfully`.magenta.bold);
-//         }
-//         callback && callback();
-//     });
-// };
 
 const setRedisData = (redis_KEY, new_FlightsArray, callback) => {
     const internationalFlights = new_FlightsArray.filter(
@@ -237,7 +215,7 @@ function run() {
                                                 );
 
                                                 console.log(
-                                                    `Page ${pageNumber}, Date ${date}`
+                                                    `Page ${pageNumber}, Date ${date}, Type ${type}, isInternational ${status}`
                                                         .blue.bold,
                                                     new_FlightsArray
                                                 );
