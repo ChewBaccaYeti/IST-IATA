@@ -5,17 +5,15 @@ const express = require('express');
 const moment = require('moment-timezone');
 
 const port = 3000;
-const base_URL =
-    'https://www.istairport.com/umbraco/api/FlightInfo/GetFlightStatusBoard';
-// Убрал лишние хедеры, которые после проверки запуском не играли роли, судя по ответу
+const base_url = 'https://www.istairport.com/umbraco/api/FlightInfo/GetFlightStatusBoard';
 const headers = {
-    Accept: 'application/json, text/javascript, */*; q=0.01',
-    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-    Origin: 'https://www.istairport.com',
-    Referer:
-        'https://www.istairport.com/en/flights/flight-info/departure-flights/?locale=en',
-    'User-Agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    "Accept": "application/json, text/javascript, */*; q=0.01",
+    "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+    "Origin": "https://www.istairport.com",
+    "Referer":
+        "https://www.istairport.com/en/flights/flight-info/departure-flights/?locale=en",
+    "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
 };
 const proxy = 'http://speej9xhkw:KbdCbB22xmdmxpG28k@dc.smartproxy.com:10000';
 const FMT = 'YYYY-MM-DD HH:mm';
@@ -23,12 +21,12 @@ const TMZN = 'Europe/Istanbul';
 const day = moment().tz(TMZN);
 const dates = [day.format(FMT), day.clone().add(1, 'd').format(FMT)];
 
-const redis_URL = 'redis://127.0.0.1:6379';
-const redis_KEY = 'airports:istanbul';
+const redis_url = 'redis://127.0.0.1:6379';
+const redis_key = 'airports:istanbul';
 
 const redis = require('redis')
     .createClient({
-        url: redis_URL,
+        url: redis_url,
     })
     .on('connect', () => {
         console.log(`[${day}][redis] connected`.magenta.bold);
@@ -43,7 +41,7 @@ const app = express();
 
 app.get('/schedules', (req, res) => {
     // http://localhost:3000/schedules - endpoint для получения расписания рейсов
-    redis.get(redis_KEY, (e, reply) => {
+    redis.get(redis_key, (e, reply) => {
         if (!reply) return res.status(404).json({ error: 'Data not found' });
 
         try {
@@ -56,55 +54,16 @@ app.get('/schedules', (req, res) => {
     console.log(`Server started on port ${port}`.bgYellow.bold);
 });
 
-// Функция для работы с редисом, которая  принимает основной код и фильтрацию домашних и международних рейсов, путём добавления соответсвующего флага к последним
-const setRedisData = (redis_KEY, new_FlightsArray, callback) => {
-    const internationalFlights = new_FlightsArray.filter(
-        (flight) => flight.isInternational === 1
-    );
-
-    const domesticFlights = new_FlightsArray.filter(
-        (flight) => flight.isInternational === 0
-    );
-
-    redis.set(
-        `${redis_KEY}:international`,
-        JSON.stringify(internationalFlights),
-        (err) => {
-            if (err) {
-                console.error(
-                    `[${day}][redis] set error for international flights: %j`
-                        .red.bold,
-                    err
-                );
-            } else {
-                console.log(
-                    `[${day}][redis] International flights data set successfully`
-                        .magenta.bold
-                );
-            }
+// Функция для работы с расписанием, записывает данные в Редис
+const setRedisData = (redis_key, newFlightsArray, callback) => {
+    redis.set(redis_key, JSON.stringify(newFlightsArray), (err) => {
+        if (err) {
+            console.error(`[${day}][redis] set error: %j`.red.bold, err);
+        } else {
+            console.log(`[${day}][redis] data set successfully`.magenta.bold);
         }
-    );
-
-    redis.set(
-        `${redis_KEY}:domestic`,
-        JSON.stringify(domesticFlights),
-        (err) => {
-            if (err) {
-                console.error(
-                    `[${day}][redis] set error for domestic flights: %j`.red
-                        .bold,
-                    err
-                );
-            } else {
-                console.log(
-                    `[${day}][redis] Domestic flights data set successfully`
-                        .magenta.bold
-                );
-            }
-
-            callback && callback();
-        }
-    );
+        callback && callback();
+    });
 };
 
 const shutdownSignal = () => {
@@ -124,70 +83,63 @@ process.once('SIGTERM', shutdownSignal); // listen for TERM signal .e.g. kill
 process.once('SIGINT', shutdownSignal); // listen for INT signal .e.g. Ctrl-C
 
 function dataFlights() {
-    const min_pageSize = 11;
-    const max_pageSize = 45;
+    const min_page_size = 11;
+    const max_page_size = 45;
     const max_retries = 3;
-    const retry_interval = 3000;
-    let new_FlightsArray = [];
+    let newFlightsArray = [];
     let finished = false;
-    // последняя переменная пока не используется потому что я еще не придумал как прописать until
 
     async.eachLimit(
-        Array.from({ length: max_pageSize }, (_, i) => i + 1),
+        Array.from({ length: max_page_size }, (_, i) => i + 1),
         20,
-        function (pageNumber, next_page) {
-            // Использую async.eachSeries чтобы прогонять асинхронные функции по одной
+        (pageNumber, next_page) => {
             async.eachSeries(
-                [0, 1],
-                function (status, next_status) {
-                    async.eachSeries([0, 1], function (type, next_type) {
-                        // заменил async.each на async.eachSeries
+                dates,
+                (date, next_date) => {
+                    async.eachSeries(
+                        [0, 1], 
+                        (type, next_type) => {
                         async.each(
-                            dates,
-                            function (date, next_date) {
-                                let new_fieldsFlights;
+                            [0, 1],
+                            (status, next_status) => {
 
+                                let newFieldsFlights;
                                 let tries = 0;
-                                async.retry(
-                                    {
-                                        times: max_retries,
-                                        interval: retry_interval,
-                                    },
-                                    function (done) {
-                                        if (tries)
-                                            console.log(
-                                                `[retrying#${tries}] ${base_URL}`
-                                                    .yellow.bold
+                                
+                                async.retry(max_retries, (done) => { if (tries)
+                                console.log(
+                                            `[retrying#${tries}] ${base_url}`
+                                                .yellow.bold
                                             );
                                         tries++;
 
                                         request.post(
                                             {
-                                                url: base_URL,
+                                                url: base_url,
                                                 proxy,
                                                 headers,
                                                 formData: {
-                                                    pageSize: max_pageSize,
+                                                    pageSize: max_page_size,
                                                     pageNumber,
-                                                    flightNature: status,
-                                                    nature: type,
-                                                    isInternational: status,
                                                     '': [
                                                         `date=${date}`,
                                                         `endDate=${date}`,
                                                     ],
+                                                    flightNature: status,
+                                                    nature: type,
+                                                    isInternational: status,
                                                     searchTerm: 'changeflight',
                                                     culture: 'en',
                                                     prevFlightPage: '0',
                                                     clickedButton: 'moreFlight',
                                                 },
                                             },
-                                            function (error, response, body) {
+                                            (error, response, body) => {
                                                 // В случае ошибки, отсутствия данных или слишком мало данных, то пробуем ещё раз
                                                 if (
                                                     error ||
                                                     !body ||
-                                                    body.length < min_pageSize
+                                                    body.length < min_page_size
                                                 )
                                                     return done(true);
 
@@ -205,7 +157,7 @@ function dataFlights() {
                                                 const flightsArray =
                                                     obj.result.data.flights;
 
-                                                new_fieldsFlights =
+                                                newFieldsFlights =
                                                     flightsArray.map(
                                                         (flight) => ({
                                                             ...flight,
@@ -217,15 +169,15 @@ function dataFlights() {
                                                         })
                                                     );
                                                 // Конечный результат, массив данных после прогонки и парсинга с мапингом
-                                                new_FlightsArray.push(
-                                                    ...new_fieldsFlights
+                                                newFlightsArray.push(
+                                                    ...newFieldsFlights
                                                 );
 
-                                                // Вывожу в консоль рузультаты для наглядности, потом сотру логи
+                                                // Вывожу в консоль результаты для наглядности
                                                 console.log(
                                                     `Page ${pageNumber}, Date ${date}, Type ${type}, isInternational ${status}`
                                                         .blue.bold,
-                                                    new_FlightsArray
+                                                    newFlightsArray
                                                 );
                                                 console.log(
                                                     'Request completed successfully.'
@@ -239,8 +191,8 @@ function dataFlights() {
 
                                                 // Сохраняю данные в Redis
                                                 setRedisData(
-                                                    redis_KEY,
-                                                    new_FlightsArray,
+                                                    redis_key,
+                                                    newFlightsArray,
                                                     () => {
                                                         console.log(
                                                             `[${day}][redis] data saved in Redis successfully.`
@@ -252,12 +204,12 @@ function dataFlights() {
                                         );
                                     }
                                 );
-                                next_date();
+                                next_status();
                             },
                             next_type
                         );
                     });
-                    next_status();
+                    next_date();
                 },
                 next_page
             );
