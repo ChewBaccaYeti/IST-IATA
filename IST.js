@@ -79,12 +79,12 @@ function dataFlights() {
     const max_page_size = 45;
     const max_retries = 3;
     let newFlightsArray = [];
-    let finished = false;
+
+    let finished = false; // Добавляем переменную для отслеживания завершения
 
     async.eachLimit(
-        Array.from({ length: max_page_size }, (_, i) => i + 1), 20,
-        (pageNumber, next_page) => {
-            async.eachSeries( dates, (date, next_date) => {
+        Array.from({ length: max_page_size }, (_, i) => i + 1), 20, (pageNumber, next_page) => {
+            async.eachSeries(dates, (date, next_date) => {
                 async.eachSeries([0, 1], (type, next_type) => {
                     async.each([0, 1], (status, next_status) => {
 
@@ -92,86 +92,72 @@ function dataFlights() {
                         let tries = 0;
 
                         async.retry(max_retries, (done) => {
-                            if (tries)
-                                console.log(`[retrying#${tries}] ${base_url}`.yellow.bold);
+                                    if (tries) console.log(`[retrying#${tries}] ${base_url}`.yellow.bold);
                                     tries++;
 
-                                    request.post(
-                                        {
-                                            url: base_url,
-                                            proxy,
-                                            headers,
-                                            formData: {
-                                                pageSize: max_page_size,
-                                                pageNumber,
-                                                '': [
-                                                    `date=${date}`,
-                                                    `endDate=${date}`,
-                                                ],
-                                                flightNature: status,
-                                                nature: type,
-                                                isInternational: status,
-                                                searchTerm: 'changeflight',
-                                                culture: 'en',
-                                                prevFlightPage: '0',
-                                                clickedButton: 'moreFlight',
-                                            },
+                            request.post({
+                                        url: base_url,
+                                        proxy,
+                                        headers,
+                                        formData: {
+                                            pageSize: max_page_size,
+                                            pageNumber,
+                                            '': [
+                                                `date=${date}`,
+                                                `endDate=${date}`,
+                                            ],
+                                            flightNature: status,
+                                            nature: type,
+                                            isInternational: status,
+                                            searchTerm: 'changeflight',
+                                            culture: 'en',
+                                            prevFlightPage: '0',
+                                            clickedButton: 'moreFlight',
                                         },
+                                    },
                                         (error, response, body) => {
-                                            // В случае ошибки, отсутствия данных или слишком мало данных, то пробуем ещё раз
-                                            if (
-                                                error ||
-                                                !body ||
-                                                body.length < min_page_size
-                                            )
-                                                return done(true);
-
-                                            const obj = JSON.parse(body);
-
-                                            // В случае, если данные не парсятся или не приходит ответ
-                                            if (
-                                                !obj.result ||
-                                                !obj.result.data
-                                            ) {
+                                            if (error || !body || body.length < min_page_size) {
+                                                // В случае ошибки, отсутствия данных или слишком мало данных, то пробуем ещё раз
                                                 return done(true);
                                             }
 
-                                            //  Массив-родитель
+                                            const obj = JSON.parse(body);
+
+                                            if (!obj.result || !obj.result.data) {
+                                                // В случае, если данные не парсятся или не приходит ответ
+                                                return done(true);
+                                            }
+
                                             const flightsArray = obj.result.data.flights;
 
-                                            newFieldsFlights = flightsArray.map((flight) => ({
+                                            newFieldsFlights = flightsArray.map(
+                                                (flight) => ({
                                                     ...flight,
                                                     dep_checkin: null,
                                                     aircraft_type: null,
                                                     reg_number: null,
                                                     page_number: pageNumber,
                                                 }));
-                                                
-                                            // Конечный результат, массив данных после прогонки и парсинга с мапингом
+
                                             newFlightsArray.push(...newFieldsFlights);
 
-                                            // Вывожу в консоль результаты для наглядности
-                                            console.log(`Page ${pageNumber}, Date ${date}, Type ${type}, isInternational ${status}`.blue.bold, 
+                                            console.log(`Page ${pageNumber}, Date ${date}`.blue.bold,
                                                 newFlightsArray);
-
                                             console.log('Request completed successfully.'.green.bold);
                                             console.log(`Proxy is configured and request were made via proxy: ${proxy}`.cyan.bold);
                                             done();
 
                                             // Сохраняю данные в Redis
-                                            setRedisData(redis_key, newFlightsArray, () => {console.log(`[${day}][redis] data saved in Redis successfully.`.magenta.bold)});
-                                        }
-                                    );
-                                });
-                                next_status();
-                            },
-                            next_type
-                        );
-                    });
-                    next_date();
-                },
-                next_page
-            );
-        }
+                                            setRedisData(redis_key, newFlightsArray, () => {
+                                                    console.log(`[${day}][redis] data saved in Redis successfully.`.magenta.bold);
+                                                });
+                            });
+                        });
+                        next_status();
+                    }, next_type);
+                });
+                next_date();
+            }, next_page);
+        },
     );
 }
