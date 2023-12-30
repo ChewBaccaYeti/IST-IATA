@@ -153,39 +153,36 @@ function dataFlights() {
                                                             arr_baggage: '' || null, //❌
                                                             arr_delayed:  '' || null,
                                                             arr_estimated: moment(flight.estimatedDatetime).format(FMT) || null,
-                                                            arr_estimated_ts: moment(flight.estimatedDatetime).format(FMT) /1000, //?
+                                                            arr_estimated_ts: moment(flight.estimatedDatetime).unix(),
                                                             arr_estimated_utc: moment.utc(flight.estimatedDatetime).format(FMT) || null,
                                                             arr_gate: '' || null, //❌
                                                             arr_iata: flight.toCityCode || null, //✅
                                                             arr_icao: flight.toCityName || null, //✅
                                                             arr_terminal: '' || null, //❌
-                                                            arr_time: flight.scheduledDatetime || null,
-                                                            arr_time_ts: new Date(flight.scheduledDatetime).getTime() /1000,
-                                                            arr_time_utc: flight.scheduledDatetime || null,
-                                                            arr_actual: flight.estimatedDatetime || null,
-                                                            arr_actual_ts: new Date(flight.estimatedDatetime).getTime() /1000,
-                                                            arr_actual_utc: flight.estimatedDatetime || null,
-
+                                                            arr_time: moment(flight.scheduledDatetime).format(FMT) || null,
+                                                            arr_time_ts: moment(flight.scheduledDatetime).unix(),
+                                                            arr_time_utc: moment.utc(flight.scheduledDatetime).format(FMT) || null,
+                                                            arr_actual: moment(flight.estimatedDatetime).format(FMT) || null,
+                                                            arr_actual_ts: moment(flight.estimatedDatetime).unix(),
+                                                            arr_actual_utc: moment.utc(flight.estimatedDatetime).format(FMT) || null,
                                                             cs_airline_iata: flight.airlineCodeList || null, //❌
                                                             cs_flight_number: flight.codeshare || null, //❌
                                                             cs_flight_iata: '' || null, //❌
                                                             delayed: flight.remarkCode || null,
-
-                                                            dep_actual: flight.estimatedDatetime || null,
-                                                            dep_actual_ts: new Date(flight.estimatedDatetime).getTime() /1000,
-                                                            dep_actual_utc: flight.estimatedDatetime || null,
+                                                            dep_actual: moment(flight.estimatedDatetime).format(FMT) || null,
+                                                            dep_actual_ts: moment(flight.estimatedDatetime).unix(),
+                                                            dep_actual_utc: moment.utc(flight.estimatedDatetime).format(FMT) || null,
                                                             dep_delayed: flight.remarkColorCode || null,
-                                                            dep_estimated: flight.estimatedDatetime || null,
-                                                            dep_estimated_ts: new Date(flight.estimatedDatetime).getTime() /1000,
-                                                            dep_estimated_utc: flight.estimatedDatetime || null,
+                                                            dep_estimated: moment(flight.estimatedDatetime).format(FMT) || null,
+                                                            dep_estimated_ts: moment(flight.estimatedDatetime).unix(),
+                                                            dep_estimated_utc: moment.utc(flight.estimatedDatetime).format(FMT) || null,
                                                             dep_gate: flight.gate || null, //❌
                                                             dep_iata: flight.fromCityCode || null, //✅
                                                             dep_icao: flight.fromCityName || null, //❌
                                                             dep_terminal: flight.carousel || null, //❌
-                                                            dep_time: flight.scheduledDatetime || null,
-                                                            dep_time_ts: new Date(flight.scheduledDatetime).getTime() /1000,
-                                                            dep_time_utc: flight.scheduledDatetime || null,
-
+                                                            dep_time: moment(flight.scheduledDatetime).format(FMT) || null,
+                                                            dep_time_ts: moment(flight.scheduledDatetime).unix(),
+                                                            dep_time_utc: moment.utc(flight.scheduledDatetime).format(FMT) || null,
                                                             duration:  '' || null,
                                                             flight_iata: flight.flightNumber || null, //✅
                                                             flight_icao: '' || null, //❌
