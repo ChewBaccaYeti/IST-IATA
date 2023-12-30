@@ -144,75 +144,63 @@ function dataFlights() {
 
                                                 const flightsArray = obj.result.data.flights;
 
-                                                newFieldsFlights =
-                                                    flightsArray.map(
-                                                        (flight) => ({
+                                                newFieldsFlights = flightsArray.map((flight) => ({
                                                             // ...flight, // Оригинальный массив данных
                                                             // Нужный формат данных, для сравнения оставил массив выше. Значение самих ключей брал из оригинального массива.
-                                                            airline_iata: flight.airlineCode,
-                                                            //!
-                                                            airline_icao: flight.airlineName,
-                                                            flight_iata: flight.flightNumber, //✅
-                                                            flight_icao: flight.airlineName,
-                                                            //
-
-                                                            flight_number: '' || null,
-
-                                                            //!
-                                                            cs_airline_iata: flight.airlineCodeList,
-                                                            cs_flight_number: flight.codeshare,
-                                                            cs_flight_iata: '',
-                                                            //
-                                                            
-                                                            dep_iata: flight.fromCityCode,
-
-                                                            //!
-                                                            dep_icao: flight.fromCityName,
-                                                            dep_terminal: flight.carousel,
-                                                            dep_gate: flight.gate,
-                                                            //
-
-                                                            dep_time: flight.scheduledDatetime,
-                                                            dep_time_ts: new Date(flight.scheduledDatetime).getTime() /1000,
-                                                            dep_time_utc: flight.scheduledDatetime,
-                                                            dep_estimated: flight.estimatedDatetime,
-                                                            dep_estimated_ts: new Date(flight.estimatedDatetime).getTime() /1000,
-                                                            dep_estimated_utc: flight.estimatedDatetime,
-                                                            dep_actual: flight.estimatedDatetime,
-                                                            dep_actual_ts: new Date(flight.estimatedDatetime).getTime() /1000,
-                                                            dep_actual_utc: flight.estimatedDatetime,
-
-                                                            arr_iata: flight.toCityCode,
-                                                            arr_icao: flight.toCityName,
-                                                            arr_terminal: '',
-                                                            arr_gate: '',
-                                                            arr_baggage: '',
-
-                                                            arr_time: flight.scheduledDatetime,
+                                                            aircraft_icao: '' || null,
+                                                            airline_iata: flight.airlineCode, //✅
+                                                            airline_icao: '' || null, //❌
+                                                            arr_baggage: '' || null, //❌
+                                                            arr_delayed:  '' || null,
+                                                            arr_estimated: moment(flight.estimatedDatetime).format(FMT) || null,
+                                                            arr_estimated_ts: moment(flight.estimatedDatetime).format(FMT) /1000, //?
+                                                            arr_estimated_utc: moment.utc(flight.estimatedDatetime).format(FMT) || null,
+                                                            arr_gate: '' || null, //❌
+                                                            arr_iata: flight.toCityCode || null, //✅
+                                                            arr_icao: flight.toCityName || null, //✅
+                                                            arr_terminal: '' || null, //❌
+                                                            arr_time: flight.scheduledDatetime || null,
                                                             arr_time_ts: new Date(flight.scheduledDatetime).getTime() /1000,
-                                                            arr_time_utc: flight.scheduledDatetime,
-                                                            arr_estimated: flight.estimatedDatetime,
-                                                            arr_estimated_ts: new Date(flight.estimatedDatetime).getTime() /1000,
-                                                            arr_estimated_utc: flight.estimatedDatetime,
-                                                            arr_actual: flight.estimatedDatetime,
+                                                            arr_time_utc: flight.scheduledDatetime || null,
+                                                            arr_actual: flight.estimatedDatetime || null,
                                                             arr_actual_ts: new Date(flight.estimatedDatetime).getTime() /1000,
-                                                            arr_actual_utc: flight.estimatedDatetime,
+                                                            arr_actual_utc: flight.estimatedDatetime || null,
 
-                                                            // status:  flight.remark,
-                                                            // duration:  '',
-                                                            // delayed: flight.remarkCode,
-                                                            // dep_delayed: flight.remarkColorCode,
-                                                            // arr_delayed:  '',
+                                                            cs_airline_iata: flight.airlineCodeList || null, //❌
+                                                            cs_flight_number: flight.codeshare || null, //❌
+                                                            cs_flight_iata: '' || null, //❌
+                                                            delayed: flight.remarkCode || null,
 
-                                                            // Новые ключи, значений нет, прописал null
-                                                            // dep_checkin:  flight.counter || null, //✅
-                                                            // aircraft_type:  null,
-                                                            // reg_number: flight.flightNumber || null,
+                                                            dep_actual: flight.estimatedDatetime || null,
+                                                            dep_actual_ts: new Date(flight.estimatedDatetime).getTime() /1000,
+                                                            dep_actual_utc: flight.estimatedDatetime || null,
+                                                            dep_delayed: flight.remarkColorCode || null,
+                                                            dep_estimated: flight.estimatedDatetime || null,
+                                                            dep_estimated_ts: new Date(flight.estimatedDatetime).getTime() /1000,
+                                                            dep_estimated_utc: flight.estimatedDatetime || null,
+                                                            dep_gate: flight.gate || null, //❌
+                                                            dep_iata: flight.fromCityCode || null, //✅
+                                                            dep_icao: flight.fromCityName || null, //❌
+                                                            dep_terminal: flight.carousel || null, //❌
+                                                            dep_time: flight.scheduledDatetime || null,
+                                                            dep_time_ts: new Date(flight.scheduledDatetime).getTime() /1000,
+                                                            dep_time_utc: flight.scheduledDatetime || null,
 
-                                                            // Ключи для проверки фильтрации по методам async, позже сотру
-                                                            // page_number: pageNumber,
-                                                            // flightNature: flight.flightNature,
-                                                            // isInternational: flight.isInternational,
+                                                            duration:  '' || null,
+                                                            flight_iata: flight.flightNumber || null, //✅
+                                                            flight_icao: '' || null, //❌
+                                                            flight_number: '' || null,
+                                                            status:  flight.remark || null,
+
+                                                            // Новые ключи
+                                                            dep_checkin:  flight.counter || null, //✅
+                                                            aircraft_type:  '' || null,
+                                                            reg_number: flight.flightNumber || null,
+
+                                                            // Ключи для проверки фильтрации по методам async
+                                                            page_number: pageNumber || null,
+                                                            flightNature: flight.flightNature || null,
+                                                            isInternational: flight.isInternational || null,
                                                         })
                                                     );
 
