@@ -82,157 +82,170 @@ function dataFlights() {
     let newFlightsArray = [];
     let finished = false; // Флаг для остановки цикла async.until
 
-    async.eachLimit(
-        Array.from({ length: max_page_size }, (_, i) => i + 1), 20, (pageNumber, next_page) => {
-            async.eachSeries(dates,(date, next_date) => {
-                    async.eachSeries([0, 1], (type, next_type) => {
-                        async.each([0, 1],(status, next_status) => {
+    pageNumber = 0;
+    async.eachSeries(dates, (date, next_date) => {
+        async.eachSeries([0, 1], (status, next_status) => {
+            async.each([0, 1], (type, next_type) => {
 
-                                let newFieldsFlights;
-                                let tries = 0;
+                    let newFieldsFlights;
+                    let tries = 0;
 
-                                async.until(function test(cb) {
-                                        cb(null, finished)
-                                    }, function iter(done) {
-                                        async.retry(max_retries, (retry_done) => {
-                                                if (tries) console.log(`[retrying#${tries}] ${base_url}`.yellow.bold);
-                                                tries++;
+                    async.until(
+                        (cb) => { // test 
+                            cb(null, finished);
+                        },
+                        (done) => { // iter 
+                            async.retry(max_retries, (retry_done) => {
+                                    if (tries) console.log(`[retrying#${tries}] ${base_url}`.yellow.bold);
+                                    tries++;
 
-                                                request.post(
-                                                    {
-                                                        url: base_url,
-                                                        proxy,
-                                                        headers,
-                                                        formData: {
-                                                            pageSize:max_page_size,
-                                                            pageNumber,
-                                                            "": [
-                                                                `date=${date}`,
-                                                                `endDate=${date}`,
-                                                            ],
-                                                            nature: type,
-                                                            flightNature: type, // 0 - departure, 1 - arrival
-                                                            isInternational: status, // 0 - domestic, 1 - international
-                                                            searchTerm: "changeflight",
-                                                            culture: "en",
-                                                            prevFlightPage: "0",
-                                                            clickedButton: "moreFlight",
-                                                        },
-                                                    },
-                                                    (error, response, body) => {
-                                                        if (
-                                                            error ||
-                                                            !body ||
-                                                            body.length < min_page_size
-                                                        ) {
-                                                            // В случае ошибки, отсутствия данных или слишком мало данных, то пробуем ещё раз
-                                                            return retry_done(true);
-                                                        }
-
-                                                        const obj = JSON.parse(body);
-
-                                                        if (
-                                                            !obj.result ||
-                                                            !obj.result.data
-                                                        ) {
-                                                            // В случае, если данные не парсятся или не приходит ответ
-                                                            return retry_done(true);
-                                                        }
-
-                                                        const flightsArray = obj.result.data.flights;
-
-                                                        newFieldsFlights =
-                                                            flightsArray.map(
-                                                                (flight) => ({
-                                                                    // ...flight, // Оригинальный массив данных
-                                                                    // Нужный формат данных, для сравнения оставил массив выше. Значение самих ключей брал из оригинального массива.
-                                                                    airline_iata: flight.airlineCode,
-                                                                    airline_icao: flight.airlineName,
-                                                                    flight_iata: flight.airlineCode,
-                                                                    flight_icao: flight.airlineName,
-                                                                    flight_number: flight.flightNumber,
-                                                                    cs_airline_iata: flight.airlineCodeList,
-                                                                    cs_flight_number: flight.codeshare,
-                                                                    cs_flight_iata: "",
-                                                                    dep_iata: flight.fromCityCode,
-                                                                    dep_icao: flight.fromCityName,
-                                                                    dep_terminal: flight.carousel,
-                                                                    dep_gate: flight.gate,
-
-                                                                    dep_time: flight.scheduledDatetime,
-                                                                    dep_time_ts: new Date(flight.scheduledDatetime ).getTime() / 1000,
-                                                                    dep_time_utc: flight.scheduledDatetime,
-                                                                    dep_estimated: flight.estimatedDatetime,
-                                                                    dep_estimated_ts: new Date(flight.estimatedDatetime ).getTime() / 1000,
-                                                                    dep_estimated_utc: flight.estimatedDatetime,
-                                                                    dep_actual: flight.estimatedDatetime,
-                                                                    dep_actual_ts: new Date(flight.estimatedDatetime ).getTime() / 1000,
-                                                                    dep_actual_utc: flight.estimatedDatetime,
-
-                                                                    arr_iata: flight.toCityCode,
-                                                                    arr_icao: flight.toCityName,
-                                                                    arr_terminal: "",
-                                                                    arr_gate: "",
-                                                                    arr_baggage: "",
-
-                                                                    arr_time: flight.scheduledDatetime,
-                                                                    arr_time_ts: new Date(flight.scheduledDatetime ).getTime() / 1000,
-                                                                    arr_time_utc: flight.scheduledDatetime,
-                                                                    arr_estimated: flight.estimatedDatetime,
-                                                                    arr_estimated_ts: new Date(flight.estimatedDatetime ).getTime() / 1000,
-                                                                    arr_estimated_utc: flight.estimatedDatetime,
-                                                                    arr_actual: flight.estimatedDatetime,
-                                                                    arr_actual_ts: new Date(flight.estimatedDatetime ).getTime() / 1000,
-                                                                    arr_actual_utc: flight.estimatedDatetime,
-
-                                                                    status: flight.remark,
-                                                                    duration: "",
-                                                                    delayed: flight.remarkCode,
-                                                                    dep_delayed: flight.remarkColorCode,
-                                                                    arr_delayed: "",
-
-                                                                    // Новые ключи, значений нет, прописал null
-                                                                    dep_checkin: null,
-                                                                    aircraft_type: null,
-                                                                    reg_number: flight.flightNumber,
-
-                                                                    // Ключи для проверки фильтрации по методам async, позже сотру
-                                                                    page_number: pageNumber,
-                                                                    flightNature: flight.flightNature,
-                                                                    isInternational: flight.isInternational,
-                                                                })
-                                                            );
-
-                                                        newFlightsArray.push(...newFieldsFlights); // Добавляем новые данные в массив, в данном случае новые данные добавляются в конец массива, однако больше имеет смысл когда приходит оригинальный массив
-
-                                                        console.log(`Page ${pageNumber}, Date ${date}`.blue.bold,
-                                                            newFlightsArray);
-                                                        console.log("Request completed successfully.".green.bold);
-                                                        console.log(`Proxy is configured and request were made via proxy: ${proxy}`.cyan.bold);
-
-                                                        finished = true;
-                                                        retry_done();
-                                                    }
-                                                );
+                                    request.post(
+                                        {
+                                            url: base_url,
+                                            proxy,
+                                            headers,
+                                            formData: {
+                                                pageNumber,
+                                                pageSize: max_page_size,
+                                                '': [
+                                                    `date=${date}`,
+                                                    `endDate=${date}`,
+                                                ],
+                                                nature: status,
+                                                flightNature: status, // 0 - departure, 1 - arrival
+                                                isInternational: type, // 0 - domestic, 1 - international
+                                                searchTerm: 'changeflight',
+                                                culture: 'en',
+                                                prevFlightPage: '0',
+                                                clickedButton: 'moreFlight',
                                             },
-
-                                            function iter_callback() {
-                                                done();
+                                        },
+                                        (error, response, body) => {
+                                            if (
+                                                error ||
+                                                !body ||
+                                                body.length < min_page_size
+                                            ) {
+                                                // В случае ошибки, отсутствия данных или слишком мало данных, то пробуем ещё раз
+                                                return retry_done(true);
                                             }
-                                        );
-                                    },
-                                    function test_callback() {
-                                        next_status();
-                                    }
-                                );
-                            },
-                            next_type
-                        );
-                    });
-                    next_date();
+                                            pageNumber++;
+
+                                            try {
+                                                const obj = JSON.parse(body);
+
+                                                if (
+                                                    !obj.result ||
+                                                    !obj.result.data
+                                                ) {
+                                                    // В случае, если данные не парсятся или не приходит ответ
+                                                    return retry_done(true);
+                                                }
+
+                                                const flightsArray = obj.result.data.flights;
+
+                                                newFieldsFlights =
+                                                    flightsArray.map(
+                                                        (flight) => ({
+                                                            // ...flight, // Оригинальный массив данных
+                                                            // Нужный формат данных, для сравнения оставил массив выше. Значение самих ключей брал из оригинального массива.
+                                                            airline_iata: flight.airlineCode,
+                                                            //!
+                                                            airline_icao: flight.airlineName,
+                                                            flight_iata: flight.flightNumber, //✅
+                                                            flight_icao: flight.airlineName,
+                                                            //
+
+                                                            flight_number: '' || null,
+
+                                                            //!
+                                                            cs_airline_iata: flight.airlineCodeList,
+                                                            cs_flight_number: flight.codeshare,
+                                                            cs_flight_iata: '',
+                                                            //
+                                                            
+                                                            dep_iata: flight.fromCityCode,
+
+                                                            //!
+                                                            dep_icao: flight.fromCityName,
+                                                            dep_terminal: flight.carousel,
+                                                            dep_gate: flight.gate,
+                                                            //
+
+                                                            dep_time: flight.scheduledDatetime,
+                                                            dep_time_ts: new Date(flight.scheduledDatetime).getTime() /1000,
+                                                            dep_time_utc: flight.scheduledDatetime,
+                                                            dep_estimated: flight.estimatedDatetime,
+                                                            dep_estimated_ts: new Date(flight.estimatedDatetime).getTime() /1000,
+                                                            dep_estimated_utc: flight.estimatedDatetime,
+                                                            dep_actual: flight.estimatedDatetime,
+                                                            dep_actual_ts: new Date(flight.estimatedDatetime).getTime() /1000,
+                                                            dep_actual_utc: flight.estimatedDatetime,
+
+                                                            arr_iata: flight.toCityCode,
+                                                            arr_icao: flight.toCityName,
+                                                            arr_terminal: '',
+                                                            arr_gate: '',
+                                                            arr_baggage: '',
+
+                                                            arr_time: flight.scheduledDatetime,
+                                                            arr_time_ts: new Date(flight.scheduledDatetime).getTime() /1000,
+                                                            arr_time_utc: flight.scheduledDatetime,
+                                                            arr_estimated: flight.estimatedDatetime,
+                                                            arr_estimated_ts: new Date(flight.estimatedDatetime).getTime() /1000,
+                                                            arr_estimated_utc: flight.estimatedDatetime,
+                                                            arr_actual: flight.estimatedDatetime,
+                                                            arr_actual_ts: new Date(flight.estimatedDatetime).getTime() /1000,
+                                                            arr_actual_utc: flight.estimatedDatetime,
+
+                                                            // status:  flight.remark,
+                                                            // duration:  '',
+                                                            // delayed: flight.remarkCode,
+                                                            // dep_delayed: flight.remarkColorCode,
+                                                            // arr_delayed:  '',
+
+                                                            // Новые ключи, значений нет, прописал null
+                                                            // dep_checkin:  flight.counter || null, //✅
+                                                            // aircraft_type:  null,
+                                                            // reg_number: flight.flightNumber || null,
+
+                                                            // Ключи для проверки фильтрации по методам async, позже сотру
+                                                            // page_number: pageNumber,
+                                                            // flightNature: flight.flightNature,
+                                                            // isInternational: flight.isInternational,
+                                                        })
+                                                    );
+
+                                                newFlightsArray.push(...newFieldsFlights); // Добавляем новые данные в массив, в данном случае новые данные добавляются в конец массива, однако больше имеет смысл когда приходит оригинальный массив
+
+                                                console.log(`Page ${pageNumber}, Date ${date}`.blue.bold,
+                                                        newFlightsArray);
+                                                console.log('Request completed successfully.'.green.bold);
+                                                console.log(`Proxy is configured and request were made via proxy: ${proxy}`.cyan.bold);
+
+                                                finished = true;
+                                                retry_done();
+
+                                            } catch (error) {
+                                                console.log(`[error] ${error}`.red.bold);
+                                                return retry_done(true);
+                                            }
+                                        }
+                                    );
+                                },
+                                function iter_callback() {
+                                    done();
+                                }
+                            );
+                        },
+                        function test_callback() {
+                            next_type();
+                        }
+                    );
                 },
-                next_page
+                next_status()
             );
-        }
-    );
+        });
+        next_date();
+    });
 }
