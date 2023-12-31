@@ -150,39 +150,39 @@ function dataFlights() {
                                                             aircraft_icao: '' || null,
                                                             airline_iata: flight.airlineCode, //✅
                                                             airline_icao: '' || null, //❌
-                                                            arr_baggage: '' || null, //❌
+                                                            arr_baggage: status === 1 ? flight.carousel : null, //?
                                                             arr_delayed:  '' || null,
-                                                            arr_estimated: moment(flight.estimatedDatetime).format(FMT) || null,
-                                                            arr_estimated_ts: moment(flight.estimatedDatetime).unix(),
-                                                            arr_estimated_utc: moment.utc(flight.estimatedDatetime).format(FMT) || null,
-                                                            arr_gate: '' || null, //❌
+                                                            arr_estimated: status === 1 ? moment(flight.estimatedDatetime).format(FMT) : null,
+                                                            arr_estimated_ts: status === 1 ? moment(flight.estimatedDatetime).unix() : null,
+                                                            arr_estimated_utc: status === 1 ? moment.utc(flight.estimatedDatetime).format(FMT) : null,
+                                                            arr_gate: status === 1 ? flight.gate : null, //✅
                                                             arr_iata: flight.toCityCode || null, //✅
                                                             arr_icao: flight.toCityName || null, //✅
-                                                            arr_terminal: '' || null, //❌
-                                                            arr_time: moment(flight.scheduledDatetime).format(FMT) || null,
-                                                            arr_time_ts: moment(flight.scheduledDatetime).unix(),
-                                                            arr_time_utc: moment.utc(flight.scheduledDatetime).format(FMT) || null,
-                                                            arr_actual: moment(flight.estimatedDatetime).format(FMT) || null,
-                                                            arr_actual_ts: moment(flight.estimatedDatetime).unix(),
-                                                            arr_actual_utc: moment.utc(flight.estimatedDatetime).format(FMT) || null,
-                                                            cs_airline_iata: flight.airlineCodeList || null, //❌
-                                                            cs_flight_number: flight.codeshare || null, //❌
+                                                            arr_terminal: '' || null, //?
+                                                            arr_time: status === 1 ? moment(flight.scheduledDatetime).format(FMT) : null,
+                                                            arr_time_ts: status === 1 ? moment(flight.scheduledDatetime).unix() : null,
+                                                            arr_time_utc: status === 1 ? moment.utc(flight.scheduledDatetime).format(FMT) : null,
+                                                            arr_actual: status === 1 ? moment(flight.estimatedDatetime).format(FMT) : null,
+                                                            arr_actual_ts: status === 1 ? moment(flight.estimatedDatetime).unix() : null,
+                                                            arr_actual_utc: status === 1 ? moment.utc(flight.estimatedDatetime).format(FMT) : null,
+                                                            cs_airline_iata: '' || null, //❌
+                                                            cs_flight_number: '' || null, //❌
                                                             cs_flight_iata: '' || null, //❌
                                                             delayed: flight.remarkCode || null,
-                                                            dep_actual: moment(flight.estimatedDatetime).format(FMT) || null,
-                                                            dep_actual_ts: moment(flight.estimatedDatetime).unix(),
-                                                            dep_actual_utc: moment.utc(flight.estimatedDatetime).format(FMT) || null,
+                                                            dep_actual: status === 0 ? moment(flight.estimatedDatetime).format(FMT) : null,
+                                                            dep_actual_ts: status === 0 ? moment(flight.estimatedDatetime).unix() : null,
+                                                            dep_actual_utc: status === 0 ? moment.utc(flight.estimatedDatetime).format(FMT) : null,
                                                             dep_delayed: flight.remarkColorCode || null,
-                                                            dep_estimated: moment(flight.estimatedDatetime).format(FMT) || null,
-                                                            dep_estimated_ts: moment(flight.estimatedDatetime).unix(),
-                                                            dep_estimated_utc: moment.utc(flight.estimatedDatetime).format(FMT) || null,
-                                                            dep_gate: flight.gate || null, //❌
+                                                            dep_estimated: status === 0 ? moment(flight.estimatedDatetime).format(FMT) : null,
+                                                            dep_estimated_ts: status === 0 ? moment(flight.estimatedDatetime).unix() : null,
+                                                            dep_estimated_utc: status === 0 ? moment.utc(flight.estimatedDatetime).format(FMT) : null,
+                                                            dep_gate: status === 0 ? flight.gate : null || null, //✅
                                                             dep_iata: flight.fromCityCode || null, //✅
-                                                            dep_icao: flight.fromCityName || null, //❌
-                                                            dep_terminal: flight.carousel || null, //❌
-                                                            dep_time: moment(flight.scheduledDatetime).format(FMT) || null,
-                                                            dep_time_ts: moment(flight.scheduledDatetime).unix(),
-                                                            dep_time_utc: moment.utc(flight.scheduledDatetime).format(FMT) || null,
+                                                            dep_icao: '' || null, //❌
+                                                            dep_terminal: '' || null, //?
+                                                            dep_time: status === 0 ? moment(flight.scheduledDatetime).format(FMT) : null,
+                                                            dep_time_ts: status === 0 ? moment(flight.scheduledDatetime).unix() : null,
+                                                            dep_time_utc: status === 0 ? moment.utc(flight.scheduledDatetime).format(FMT) : null,
                                                             duration:  '' || null,
                                                             flight_iata: flight.flightNumber || null, //✅
                                                             flight_icao: '' || null, //❌
@@ -195,9 +195,10 @@ function dataFlights() {
                                                             reg_number: flight.flightNumber || null,
 
                                                             // Ключи для проверки фильтрации по методам async
+                                                            id: flight.id || null,
                                                             page_number: pageNumber || null,
-                                                            flightNature: flight.flightNature || null,
-                                                            isInternational: flight.isInternational || null,
+                                                            flight_nature: status || null,
+                                                            is_international: type || null,
                                                         })
                                                     );
 
