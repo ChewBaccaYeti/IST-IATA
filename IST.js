@@ -31,6 +31,14 @@ const redis = require("redis")
     .on("reconnecting", (p) => console.log(`[${day}][redis] reconnecting: %j`.magenta.bold, p))
     .on("error", (e) => console.error(`[${day}][redis] error: %j`.red.bold, e));
 
+redis.del(redis_key, (err, reply) => {
+    if (err) {
+        console.error(`[${day}][redis] delete error: %j`.red.bold, err);
+    } else {
+        console.log(`[${day}][redis] data deleted successfully`.magenta.bold);
+    }
+})
+
 const app = express();
 
 app.get("/schedules", (req, res) => {
@@ -75,8 +83,8 @@ process.once("SIGTERM", shutdownSignal); // listen for TERM signal .e.g. kill
 process.once("SIGINT", shutdownSignal); // listen for INT signal .e.g. Ctrl-C
 
 function dataFlights() {
-    const min_page_size = 11;
-    const max_page_size = 45;
+    const min_body_length = 11;
+    const max_page_size = 50;
     const max_retries = 3;
 
     let newFlightsArray = [];
@@ -124,7 +132,7 @@ function dataFlights() {
                                             if (
                                                 error ||
                                                 !body ||
-                                                body.length < min_page_size
+                                                body.length < min_body_length
                                             ) {
                                                 // В случае ошибки, отсутствия данных или слишком мало данных, то пробуем ещё раз
                                                 return retry_done(true);
@@ -186,7 +194,7 @@ function dataFlights() {
                                                             duration:  "" || null,
                                                             flight_iata: flight.flightNumber || null, //✅
                                                             flight_icao: "" || null, //❌
-                                                            flight_number: "" || null,
+                                                            flight_number: "" || null, //❌
                                                             status:  flight.remark || null,
 
                                                             // Новые ключи
@@ -209,7 +217,12 @@ function dataFlights() {
                                                 console.log('Request completed successfully.'.green.bold);
                                                 console.log(`Proxy is configured and request were made via proxy: ${proxy}`.cyan.bold);
 
-                                                finished = true;
+                                                if (newFlightsArray.length >= max_page_size) {
+                                                    finished = false;
+                                                } else {
+                                                    finished = true;
+                                                }
+
                                                 retry_done();
 
                                             } catch (error) {
@@ -233,5 +246,9 @@ function dataFlights() {
             );
         });
         next_date();
+    }, () => {
+        setRedisData(redis_key, newFlightsArray, () => {
+            console.log(`[${day}][redis] Flight data saved to Redis successfully.`.bgMagenta.bold);
+        });
     });
 }
