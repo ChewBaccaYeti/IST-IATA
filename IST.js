@@ -35,7 +35,7 @@ redis.del(redis_key, (err, reply) => {
     if (err) {
         console.error(`[${day}][redis] delete error: %j`.red.bold, err);
     } else {
-        console.log(`[${day}][redis] data deleted successfully`.magenta.bold);
+        console.log(`[${day}][redis] data deleted successfully`.bgMagenta.bold);
     }
 })
 
@@ -155,52 +155,58 @@ function dataFlights() {
                                                 newFieldsFlights = flightsArray.map((flight) => ({
                                                             // ...flight, // Оригинальный массив данных
                                                             // Нужный формат данных, для сравнения оставил массив выше. Значение самих ключей брал из оригинального массива.
-                                                            aircraft_icao: "" || null,
                                                             airline_iata: flight.airlineCode, //✅
-                                                            airline_icao: "" || null, //❌
                                                             arr_baggage: flight.carousel, //✅
-                                                            arr_delayed:  "" || null,
-                                                            arr_estimated: status === 1 ? moment(flight.estimatedDatetime).format(FMT) : null,
-                                                            arr_estimated_ts: status === 1 ? moment(flight.estimatedDatetime).unix() : null,
-                                                            arr_estimated_utc: status === 1 ? moment.utc(flight.estimatedDatetime).format(FMT) : null,
+
+                                                            arr_delayed: status === 1 ? Math.abs(moment(flight.scheduledDatetime, FMT).diff(moment(flight.estimatedDatetime, FMT), 'minutes')) : null, //?✅
+
+                                                            arr_estimated: status === 1 ? moment(flight.estimatedDatetime).format(FMT) : null, //✅
+                                                            arr_estimated_ts: status === 1 ? moment(flight.estimatedDatetime).tz(TMZN).unix() : null, //✅
+                                                            arr_estimated_utc: status === 1 ? moment.tz(TMZN).utc(flight.estimatedDatetime).format(FMT) : null, //✅
+
                                                             arr_gate: status === 1 ? flight.gate : null, //✅
                                                             arr_iata: flight.toCityCode || null, //✅
                                                             arr_icao: flight.toCityName || null, //✅
-                                                            arr_terminal: status === 1 ? "" : null, //?✅
-                                                            arr_time: status === 1 ? moment(flight.scheduledDatetime).format(FMT) : null,
-                                                            arr_time_ts: status === 1 ? moment(flight.scheduledDatetime).unix() : null,
-                                                            arr_time_utc: status === 1 ? moment.utc(flight.scheduledDatetime).format(FMT) : null,
-                                                            arr_actual: status === 1 ? moment(flight.estimatedDatetime).format(FMT) : null,
-                                                            arr_actual_ts: status === 1 ? moment(flight.estimatedDatetime).unix() : null,
-                                                            arr_actual_utc: status === 1 ? moment.utc(flight.estimatedDatetime).format(FMT) : null,
+                                                            arr_terminal: status === 1 ? flight.gate.charAt(0) : null, //✅
+
+                                                            arr_time: status === 1 ? moment(flight.scheduledDatetime).format(FMT) : null, //✅
+                                                            arr_time_ts: status === 1 ? moment(flight.scheduledDatetime).tz(TMZN).unix() : null, //✅
+                                                            arr_time_utc: status === 1 ? moment.tz(TMZN).utc(flight.scheduledDatetime).format(FMT) : null, //✅
+                                                            arr_actual: status === 1 ? moment(flight.estimatedDatetime).format(FMT) : null, //✅
+                                                            arr_actual_ts: status === 1 ? moment(flight.estimatedDatetime).tz(TMZN).unix() : null, //✅
+                                                            arr_actual_utc: status === 1 ? moment.tz(TMZN).utc(flight.estimatedDatetime).format(FMT) : null, //✅
+
                                                             cs_airline_iata: "" || null, //❌
                                                             cs_flight_number: "" || null, //❌
                                                             cs_flight_iata: "" || null, //❌
-                                                            delayed: flight.remarkCode || null,
-                                                            dep_actual: status === 0 ? moment(flight.estimatedDatetime).format(FMT) : null,
-                                                            dep_actual_ts: status === 0 ? moment(flight.estimatedDatetime).unix() : null,
-                                                            dep_actual_utc: status === 0 ? moment.utc(flight.estimatedDatetime).format(FMT) : null,
-                                                            dep_delayed: flight.remarkColorCode || null,
-                                                            dep_estimated: status === 0 ? moment(flight.estimatedDatetime).format(FMT) : null,
-                                                            dep_estimated_ts: status === 0 ? moment(flight.estimatedDatetime).unix() : null,
-                                                            dep_estimated_utc: status === 0 ? moment.utc(flight.estimatedDatetime).format(FMT) : null,
+
+                                                            delayed: "" || null, //❌
+
+                                                            dep_actual: status === 0 ? moment(flight.estimatedDatetime).format(FMT) : null, //✅
+                                                            dep_actual_ts: status === 0 ? moment(flight.estimatedDatetime).tz(TMZN).unix() : null, //✅
+                                                            dep_actual_utc: status === 0 ? moment.tz(TMZN).utc(flight.estimatedDatetime).format(FMT) : null, //✅
+
+                                                            dep_delayed: status === 0 ? Math.abs(moment(flight.scheduledDatetime, FMT).diff(moment(flight.estimatedDatetime, FMT), 'minutes')) : null, //?✅
+
+                                                            dep_estimated: status === 0 ? moment(flight.estimatedDatetime).format(FMT) : null, //✅
+                                                            dep_estimated_ts: status === 0 ? moment(flight.estimatedDatetime).tz(TMZN).unix() : null, //✅
+                                                            dep_estimated_utc: status === 0 ? moment.tz(TMZN).utc(flight.estimatedDatetime).format(FMT) : null, //✅
+
                                                             dep_gate: status === 0 ? flight.gate : null, //✅
                                                             dep_iata: flight.fromCityCode || null, //✅
-                                                            dep_icao: "" || null, //❌
-                                                            dep_terminal: status === 0 ? "" : null, //?✅
+                                                            dep_terminal: status === 0 ? flight.gate.charAt(0) : null, //✅
+
                                                             dep_time: status === 0 ? moment(flight.scheduledDatetime).format(FMT) : null,
-                                                            dep_time_ts: status === 0 ? moment(flight.scheduledDatetime).unix() : null,
-                                                            dep_time_utc: status === 0 ? moment.utc(flight.scheduledDatetime).format(FMT) : null,
-                                                            duration:  "" || null,
+                                                            dep_time_ts: status === 0 ? moment(flight.scheduledDatetime).tz(TMZN).unix() : null,
+                                                            dep_time_utc: status === 0 ? moment.tz(TMZN).utc(flight.scheduledDatetime).format(FMT) : null,
+
                                                             flight_iata: flight.flightNumber || null, //✅
-                                                            flight_icao: "" || null, //❌
-                                                            flight_number: "" || null, //❌
-                                                            status:  flight.remark || null,
+                                                            flight_number: "" || null,
+                                                            status:  flight.remark || null, //❌
 
                                                             // Новые ключи
                                                             dep_checkin:  flight.counter || null, //✅
-                                                            aircraft_type:  "" || null,
-                                                            reg_number: flight.flightNumber || null,
+                                                            reg_number: flight.flightNumber || null, //!
 
                                                             // Ключи для проверки фильтрации по методам async
                                                             id: flight.id || null,
