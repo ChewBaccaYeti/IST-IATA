@@ -151,18 +151,12 @@ function dataFlights() {
                                                     console.log("body:".bgBlue, body);
                                                     return retry_done(true);
                                                 }
-                                                // console.log("body:".bgBlue, body);
+
                                                 const flightsArray = obj.result.data.flights;
 
                                                 const newFieldsFlights = flightsArray.flatMap((flight) => {
-                                                    const flightClones = flight.codeshare.map((code) => {
-                                                        const cs_clones = {
-                                                            "cs_airline_iata": code.slice(0, 2),
-                                                            "cs_flight_number": code.slice(2, 6),
-                                                            "cs_flight_iata": code,
-                                                        };
-                                                        return {
-                                                            "airline_iata": flight.airlineCode, //✅
+                                                    const flight_clones = flight.codeshare.map((code) => {
+                                                        const arrival_fields = {
                                                             "arr_baggage": flight.carousel, //✅
                                                             "arr_delayed": status === 1 ? Math.abs(moment(flight.scheduledDatetime, FMT).diff(moment(flight.estimatedDatetime, FMT), "minutes")) : null, //✅
                                                             "arr_estimated": status === 1 ? moment(flight.estimatedDatetime).format(FMT) : null, //✅
@@ -178,12 +172,13 @@ function dataFlights() {
                                                             "arr_actual": status === 1 ? moment(flight.estimatedDatetime).format(FMT) : null, //✅
                                                             "arr_actual_ts": status === 1 ? moment(flight.estimatedDatetime).tz(TMZN).unix() : null, //✅
                                                             "arr_actual_utc": status === 1 ? moment.tz(TMZN).utc(flight.estimatedDatetime).format(FMT) : null, //✅
-
-                                                            ...cs_clones,
-
-                                                            "delayed": //✅
-                                                                status === 1 ? Math.abs(moment(flight.scheduledDatetime, FMT).diff(moment(flight.estimatedDatetime, FMT), "minutes")) : null ||
-                                                                status === 0 ? Math.abs(moment(flight.scheduledDatetime, FMT).diff(moment(flight.estimatedDatetime, FMT), "minutes")) : null,
+                                                        };
+                                                        const cs_fields = {
+                                                            "cs_airline_iata": code.slice(0, 2),
+                                                            "cs_flight_number": code.slice(2, 6),
+                                                            "cs_flight_iata": code,
+                                                        };
+                                                        const departure_fields = {
                                                             "dep_actual": status === 0 ? moment(flight.estimatedDatetime).format(FMT) : null, //✅
                                                             "dep_actual_ts": status === 0 ? moment(flight.estimatedDatetime).tz(TMZN).unix() : null, //✅
                                                             "dep_actual_utc": status === 0 ? moment.tz(TMZN).utc(flight.estimatedDatetime).format(FMT) : null, //✅
@@ -197,23 +192,33 @@ function dataFlights() {
                                                             "dep_time": status === 0 ? moment(flight.scheduledDatetime).format(FMT) : null,//✅
                                                             "dep_time_ts": status === 0 ? moment(flight.scheduledDatetime).tz(TMZN).unix() : null,//✅
                                                             "dep_time_utc": status === 0 ? moment.tz(TMZN).utc(flight.scheduledDatetime).format(FMT) : null,//✅
-                                                            "flight_iata": flight.flightNumber, //✅
-                                                            "flight_number": flight.flightNumber.slice(2), //✅
-                                                            "status": flight.remark ? flight.remark.toLowerCase() : null, //✅
                                                             "dep_checkin":  flight.counter, //✅
-                                                            "reg_number": "",
-
-                                                            // Ключи для проверки фильтрации по методам async
-                                                            "id": flight.id,
-                                                            "page_number": pageNumber,
-                                                            "flight_nature": status,
-                                                            "is_international": type,
                                                         };
-                                                    });
+                                                        const status_fields = {
+                                                        "airline_iata": flight.airlineCode, //✅
+                                                        "delayed": //✅
+                                                            status === 1 ? Math.abs(moment(flight.scheduledDatetime, FMT).diff(moment(flight.estimatedDatetime, FMT), "minutes")) : null ||
+                                                            status === 0 ? Math.abs(moment(flight.scheduledDatetime, FMT).diff(moment(flight.estimatedDatetime, FMT), "minutes")) : null,
+                                                        "flight_iata": flight.flightNumber, //✅
+                                                        "flight_number": flight.flightNumber.slice(2), //✅
+                                                        "status": flight.remark ? flight.remark.toLowerCase() : null, //✅
+                                                        "reg_number": "",
+                                                        // Ключи для проверки фильтрации по методам async
+                                                        "id": flight.id,
+                                                        "page_number": pageNumber,
+                                                        "flight_nature": status,
+                                                        "is_international": type,
+                                                        };
+                                                        const clonedFlight = {
+                                                            ...arrival_fields,
+                                                            ...cs_fields,
+                                                            ...departure_fields,
+                                                            ...status_fields,
+                                                        };
 
-                                                    return [
-                                                        ...flightClones,
-                                                    ];
+                                                        return clonedFlight;
+                                                    });
+                                                    return flight_clones;
                                                 });
 
                                                 newFlightsArray.push(...newFieldsFlights); // Добавляем новые данные в массив
