@@ -84,19 +84,18 @@ process.once("SIGTERM", shutdownSignal); // listen for TERM signal .e.g. kill
 process.once("SIGINT", shutdownSignal); // listen for INT signal .e.g. Ctrl-C
 
 function dataFlights() {
-    const min_body_length = 11;
+    const min_body_length = 10;
     const max_page_size = 50;
     const max_retries = 3;
 
     let newFlightsArray = [];
     let finished = false; // Флаг для остановки цикла async.until
 
-    pageNumber = 0;
+    pageNumber = 1;
     async.eachSeries(dates, (date, next_date) => {
         async.eachSeries([0, 1], (status, next_status) => {
             async.each([0, 1], (type, next_type) => {
 
-                    let newFieldsFlights;
                     let tries = 0;
 
                     async.until(
@@ -152,65 +151,72 @@ function dataFlights() {
                                                     console.log("body:".bgBlue, body);
                                                     return retry_done(true);
                                                 }
-
+                                                // console.log("body:".bgBlue, body);
                                                 const flightsArray = obj.result.data.flights;
 
-                                                newFieldsFlights = flightsArray.map((flight) => ({
-                                                            // ...flight, // Оригинальный массив данных
-                                                            // Нужный формат данных, для сравнения оставил массив выше. Значение самих ключей брал из оригинального массива.
-                                                            airline_iata: flight.airlineCode, //✅
-                                                            arr_baggage: flight.carousel, //✅
-                                                            arr_delayed: status === 1 ? Math.abs(moment(flight.scheduledDatetime, FMT).diff(moment(flight.estimatedDatetime, FMT), 'minutes')) : null, //✅
-                                                            arr_estimated: status === 1 ? moment(flight.estimatedDatetime).format(FMT) : null, //✅
-                                                            arr_estimated_ts: status === 1 ? moment(flight.estimatedDatetime).tz(TMZN).unix() : null, //✅
-                                                            arr_estimated_utc: status === 1 ? moment.tz(TMZN).utc(flight.estimatedDatetime).format(FMT) : null, //✅
-                                                            arr_gate: status === 1 ? flight.gate : null, //✅
-                                                            arr_iata: flight.toCityCode || null, //✅
-                                                            arr_icao: flight.toCityName || null, //✅
-                                                            arr_terminal: status === 1 ? flight.gate.charAt(0) : null, //✅
-                                                            arr_time: status === 1 ? moment(flight.scheduledDatetime).format(FMT) : null, //✅
-                                                            arr_time_ts: status === 1 ? moment(flight.scheduledDatetime).tz(TMZN).unix() : null, //✅
-                                                            arr_time_utc: status === 1 ? moment.tz(TMZN).utc(flight.scheduledDatetime).format(FMT) : null, //✅
-                                                            arr_actual: status === 1 ? moment(flight.estimatedDatetime).format(FMT) : null, //✅
-                                                            arr_actual_ts: status === 1 ? moment(flight.estimatedDatetime).tz(TMZN).unix() : null, //✅
-                                                            arr_actual_utc: status === 1 ? moment.tz(TMZN).utc(flight.estimatedDatetime).format(FMT) : null, //✅
+                                                const newFieldsFlights = flightsArray.flatMap((flight) => {
+                                                    const flightClones = flight.codeshare.map((code) => {
+                                                        const cs_clones = {
+                                                            "cs_airline_iata": code.slice(0, 2),
+                                                            "cs_flight_number": code.slice(2, 6),
+                                                            "cs_flight_iata": code,
+                                                        };
+                                                        return {
+                                                            "airline_iata": flight.airlineCode, //✅
+                                                            "arr_baggage": flight.carousel, //✅
+                                                            "arr_delayed": status === 1 ? Math.abs(moment(flight.scheduledDatetime, FMT).diff(moment(flight.estimatedDatetime, FMT), "minutes")) : null, //✅
+                                                            "arr_estimated": status === 1 ? moment(flight.estimatedDatetime).format(FMT) : null, //✅
+                                                            "arr_estimated_ts": status === 1 ? moment(flight.estimatedDatetime).tz(TMZN).unix() : null, //✅
+                                                            "arr_estimated_utc": status === 1 ? moment.tz(TMZN).utc(flight.estimatedDatetime).format(FMT) : null, //✅
+                                                            "arr_gate": status === 1 ? flight.gate : null, //✅
+                                                            "arr_iata": flight.toCityCode, //✅
+                                                            "arr_icao": flight.toCityName, //✅
+                                                            "arr_terminal": status === 1 ? flight.gate.charAt(0) : null, //✅
+                                                            "arr_time": status === 1 ? moment(flight.scheduledDatetime).format(FMT) : null, //✅
+                                                            "arr_time_ts": status === 1 ? moment(flight.scheduledDatetime).tz(TMZN).unix() : null, //✅
+                                                            "arr_time_utc": status === 1 ? moment.tz(TMZN).utc(flight.scheduledDatetime).format(FMT) : null, //✅
+                                                            "arr_actual": status === 1 ? moment(flight.estimatedDatetime).format(FMT) : null, //✅
+                                                            "arr_actual_ts": status === 1 ? moment(flight.estimatedDatetime).tz(TMZN).unix() : null, //✅
+                                                            "arr_actual_utc": status === 1 ? moment.tz(TMZN).utc(flight.estimatedDatetime).format(FMT) : null, //✅
 
-                                                            cs_airline_iata: flight.codeshare.map(code => typeof code === 'string' ? code.replace(/[^a-zA-Z]/g, '') : null), //✅ letters
-                                                            cs_flight_number: flight.codeshare.map(code => typeof code === 'string' ? code.replace(/[^0-9]/g, '', '') : null), //✅ numbers
-                                                            cs_flight_iata: flight.codeshare || null, //✅ array
+                                                            ...cs_clones,
 
-                                                            delayed: //✅
-                                                                status === 1 ? Math.abs(moment(flight.scheduledDatetime, FMT).diff(moment(flight.estimatedDatetime, FMT), 'minutes')) : null ||
-                                                                status === 0 ? Math.abs(moment(flight.scheduledDatetime, FMT).diff(moment(flight.estimatedDatetime, FMT), 'minutes')) : null,
-                                                                
-                                                            dep_actual: status === 0 ? moment(flight.estimatedDatetime).format(FMT) : null, //✅
-                                                            dep_actual_ts: status === 0 ? moment(flight.estimatedDatetime).tz(TMZN).unix() : null, //✅
-                                                            dep_actual_utc: status === 0 ? moment.tz(TMZN).utc(flight.estimatedDatetime).format(FMT) : null, //✅
-                                                            dep_delayed: status === 0 ? Math.abs(moment(flight.scheduledDatetime, FMT).diff(moment(flight.estimatedDatetime, FMT), 'minutes')) : null, //✅
-                                                            dep_estimated: status === 0 ? moment(flight.estimatedDatetime).format(FMT) : null, //✅
-                                                            dep_estimated_ts: status === 0 ? moment(flight.estimatedDatetime).tz(TMZN).unix() : null, //✅
-                                                            dep_estimated_utc: status === 0 ? moment.tz(TMZN).utc(flight.estimatedDatetime).format(FMT) : null, //✅
-                                                            dep_gate: status === 0 ? flight.gate : null, //✅
-                                                            dep_iata: flight.fromCityCode || null, //✅
-                                                            dep_terminal: status === 0 ? flight.gate.charAt(0) : null, //✅
-                                                            dep_time: status === 0 ? moment(flight.scheduledDatetime).format(FMT) : null,//✅
-                                                            dep_time_ts: status === 0 ? moment(flight.scheduledDatetime).tz(TMZN).unix() : null,//✅
-                                                            dep_time_utc: status === 0 ? moment.tz(TMZN).utc(flight.scheduledDatetime).format(FMT) : null,//✅
-                                                            flight_iata: flight.flightNumber || null, //✅
-                                                            flight_number: flight.flightNumber.slice(2) || null, //✅
-                                                            status: flight.remark ? flight.remark.toLowerCase() : null, //✅
-                                                            dep_checkin:  flight.counter || null, //✅
-                                                            reg_number: "" || null,
+                                                            "delayed": //✅
+                                                                status === 1 ? Math.abs(moment(flight.scheduledDatetime, FMT).diff(moment(flight.estimatedDatetime, FMT), "minutes")) : null ||
+                                                                status === 0 ? Math.abs(moment(flight.scheduledDatetime, FMT).diff(moment(flight.estimatedDatetime, FMT), "minutes")) : null,
+                                                            "dep_actual": status === 0 ? moment(flight.estimatedDatetime).format(FMT) : null, //✅
+                                                            "dep_actual_ts": status === 0 ? moment(flight.estimatedDatetime).tz(TMZN).unix() : null, //✅
+                                                            "dep_actual_utc": status === 0 ? moment.tz(TMZN).utc(flight.estimatedDatetime).format(FMT) : null, //✅
+                                                            "dep_delayed": status === 0 ? Math.abs(moment(flight.scheduledDatetime, FMT).diff(moment(flight.estimatedDatetime, FMT), "minutes")) : null, //✅
+                                                            "dep_estimated": status === 0 ? moment(flight.estimatedDatetime).format(FMT) : null, //✅
+                                                            "dep_estimated_ts": status === 0 ? moment(flight.estimatedDatetime).tz(TMZN).unix() : null, //✅
+                                                            "dep_estimated_utc": status === 0 ? moment.tz(TMZN).utc(flight.estimatedDatetime).format(FMT) : null, //✅
+                                                            "dep_gate": status === 0 ? flight.gate : null, //✅
+                                                            "dep_iata": flight.fromCityCode, //✅
+                                                            "dep_terminal": status === 0 ? flight.gate.charAt(0) : null, //✅
+                                                            "dep_time": status === 0 ? moment(flight.scheduledDatetime).format(FMT) : null,//✅
+                                                            "dep_time_ts": status === 0 ? moment(flight.scheduledDatetime).tz(TMZN).unix() : null,//✅
+                                                            "dep_time_utc": status === 0 ? moment.tz(TMZN).utc(flight.scheduledDatetime).format(FMT) : null,//✅
+                                                            "flight_iata": flight.flightNumber, //✅
+                                                            "flight_number": flight.flightNumber.slice(2), //✅
+                                                            "status": flight.remark ? flight.remark.toLowerCase() : null, //✅
+                                                            "dep_checkin":  flight.counter, //✅
+                                                            "reg_number": "",
 
                                                             // Ключи для проверки фильтрации по методам async
-                                                            id: flight.id || null,
-                                                            page_number: pageNumber || null,
-                                                            flight_nature: status || null,
-                                                            is_international: type || null,
-                                                        }));
+                                                            "id": flight.id,
+                                                            "page_number": pageNumber,
+                                                            "flight_nature": status,
+                                                            "is_international": type,
+                                                        };
+                                                    });
+
+                                                    return [
+                                                        ...flightClones,
+                                                    ];
+                                                });
 
                                                 newFlightsArray.push(...newFieldsFlights); // Добавляем новые данные в массив
-
                                                 console.log(`Page ${pageNumber}, Date ${date}`.blue, newFieldsFlights);
                                                 console.log('Request completed successfully.'.green);
                                                 console.log(`Proxy is configured and request were made via proxy: ${proxy}`.cyan);
@@ -257,3 +263,55 @@ function dataFlights() {
         }
     );
 }
+// return {
+//     // ...flight, // Оригинальный массив данных
+//     // Нужный формат данных, для сравнения оставил массив выше. Значение самих ключей брал из оригинального массива.
+//     "airline_iata": flight.airlineCode, //✅
+//     "arr_baggage": flight.carousel, //✅
+//     "arr_delayed": status === 1 ? Math.abs(moment(flight.scheduledDatetime, FMT).diff(moment(flight.estimatedDatetime, FMT), "minutes")) : null, //✅
+//     "arr_estimated": status === 1 ? moment(flight.estimatedDatetime).format(FMT) : null, //✅
+//     "arr_estimated_ts": status === 1 ? moment(flight.estimatedDatetime).tz(TMZN).unix() : null, //✅
+//     "arr_estimated_utc": status === 1 ? moment.tz(TMZN).utc(flight.estimatedDatetime).format(FMT) : null, //✅
+//     "arr_gate": status === 1 ? flight.gate : null, //✅
+//     "arr_iata": flight.toCityCode, //✅
+//     "arr_icao": flight.toCityName, //✅
+//     "arr_terminal": status === 1 ? flight.gate.charAt(0) : null, //✅
+//     "arr_time": status === 1 ? moment(flight.scheduledDatetime).format(FMT) : null, //✅
+//     "arr_time_ts": status === 1 ? moment(flight.scheduledDatetime).tz(TMZN).unix() : null, //✅
+//     "arr_time_utc": status === 1 ? moment.tz(TMZN).utc(flight.scheduledDatetime).format(FMT) : null, //✅
+//     "arr_actual": status === 1 ? moment(flight.estimatedDatetime).format(FMT) : null, //✅
+//     "arr_actual_ts": status === 1 ? moment(flight.estimatedDatetime).tz(TMZN).unix() : null, //✅
+//     "arr_actual_utc": status === 1 ? moment.tz(TMZN).utc(flight.estimatedDatetime).format(FMT) : null, //✅
+
+//     "cs_airline_iata": flight.codeshare.flatMap((code => code.slice(0, 2))), //✅ letters
+//     "cs_flight_number": flight.codeshare.flatMap((code => code.slice(2, 6))), //✅ numbers
+//     "cs_flight_iata": flight.codeshare, //✅ array
+
+//     "delayed": //✅
+//         status === 1 ? Math.abs(moment(flight.scheduledDatetime, FMT).diff(moment(flight.estimatedDatetime, FMT), "minutes")) : null ||
+//         status === 0 ? Math.abs(moment(flight.scheduledDatetime, FMT).diff(moment(flight.estimatedDatetime, FMT), "minutes")) : null,
+//     "dep_actual": status === 0 ? moment(flight.estimatedDatetime).format(FMT) : null, //✅
+//     "dep_actual_ts": status === 0 ? moment(flight.estimatedDatetime).tz(TMZN).unix() : null, //✅
+//     "dep_actual_utc": status === 0 ? moment.tz(TMZN).utc(flight.estimatedDatetime).format(FMT) : null, //✅
+//     "dep_delayed": status === 0 ? Math.abs(moment(flight.scheduledDatetime, FMT).diff(moment(flight.estimatedDatetime, FMT), "minutes")) : null, //✅
+//     "dep_estimated": status === 0 ? moment(flight.estimatedDatetime).format(FMT) : null, //✅
+//     "dep_estimated_ts": status === 0 ? moment(flight.estimatedDatetime).tz(TMZN).unix() : null, //✅
+//     "dep_estimated_utc": status === 0 ? moment.tz(TMZN).utc(flight.estimatedDatetime).format(FMT) : null, //✅
+//     "dep_gate": status === 0 ? flight.gate : null, //✅
+//     "dep_iata": flight.fromCityCode, //✅
+//     "dep_terminal": status === 0 ? flight.gate.charAt(0) : null, //✅
+//     "dep_time": status === 0 ? moment(flight.scheduledDatetime).format(FMT) : null,//✅
+//     "dep_time_ts": status === 0 ? moment(flight.scheduledDatetime).tz(TMZN).unix() : null,//✅
+//     "dep_time_utc": status === 0 ? moment.tz(TMZN).utc(flight.scheduledDatetime).format(FMT) : null,//✅
+//     "flight_iata": flight.flightNumber, //✅
+//     "flight_number": flight.flightNumber.slice(2), //✅
+//     "status": flight.remark ? flight.remark.toLowerCase() : null, //✅
+//     "dep_checkin":  flight.counter, //✅
+//     "reg_number": "",
+
+//     // Ключи для проверки фильтрации по методам async
+//     "id": flight.id,
+//     "page_number": pageNumber,
+//     "flight_nature": status,
+//     "is_international": type,
+// }, 
