@@ -35,7 +35,7 @@ redis.del(redis_key, (err, reply) => {
     if (err) {
         console.error(`[${day}][redis] delete error: %j`.bgRed.bold, err);
     } else {
-        console.log(`[${day}][redis] data deleted successfully.`.bgMagenta);
+        console.log(`[${day}][redis] data deleted successfully.`.magenta);
     }
 })
 
@@ -53,7 +53,7 @@ app.get("/schedules", (req, res) => {
         }
     });
 }).listen(port, () => {
-    console.log(`Server started on port ${port}`.bgYellow);
+    console.log(`Server started on port ${port}`.yellow);
 });
 
 // Функция для работы с расписанием, записывает данные в Редис
@@ -230,7 +230,7 @@ function dataFlights() {
                                                     console.log("Loop is still running...".bgYellow);
                                                 } else {
                                                     finished = true;
-                                                    console.log("Loop is over.".bgCyan);
+                                                    console.log("Loop is over.".bgBlue);
                                                 }
                                                 
                                                 retry_done();
@@ -247,17 +247,16 @@ function dataFlights() {
                                         if (err) {
                                             console.error("Error while saving data to Redis:".bgRed.bold, err);
                                         } else {
-                                            console.log(`[${day}][redis] data saved successfully.`.bgMagenta);
+                                            console.log(`[${day}][redis] data saved successfully.`.magenta);
                                         }
-                                        next_type();  // Добавил вызов next_type здесь
                                     });
-                                }
-                            );
+                                }, next_type());
             }, next_status);
         }, next_date);
     });
 }
-// const newFieldsFlights = flightsArray.flatMap((flight) => {
+
+// const newFlights = flightsArray.flatMap((flight) => {
 //     // Проверяю, есть ли у текущего рейса codeshare
 //     if (flight.codeshare && flight.codeshare.length > 0) {
 //         const parent_flight = {
@@ -319,4 +318,73 @@ function dataFlights() {
 //         return clonedFlight;
 //     });
 //     return flight_clones;
-// }});
+// }});Ъ
+
+
+// const newFlights = flightsArray.flatMap((flight) => {
+//     if (flight.codeshare && flight.codeshare.length > 0) {
+//             const arrival_fields = {
+//                 "arr_baggage": flight.carousel,
+//                 "arr_delayed": status === 1 ? Math.abs(moment(flight.scheduledDatetime, FMT).diff(moment(flight.estimatedDatetime, FMT), "minutes")) : null,
+//                 "arr_estimated": status === 1 ? moment(flight.estimatedDatetime).format(FMT) : null,
+//                 "arr_estimated_ts": status === 1 ? moment(flight.estimatedDatetime).tz(TMZN).unix() : null,
+//                 "arr_estimated_utc": status === 1 ? moment.tz(TMZN).utc(flight.estimatedDatetime).format(FMT) : null,
+//                 "arr_gate": status === 1 ? flight.gate : null,
+//                 "arr_iata": flight.toCityCode,
+//                 "arr_icao": flight.toCityName,
+//                 "arr_terminal": status === 1 ? flight.gate.charAt(0) : null,
+//                 "arr_time": status === 1 ? moment(flight.scheduledDatetime).format(FMT) : null,
+//                 "arr_time_ts": status === 1 ? moment(flight.scheduledDatetime).tz(TMZN).unix() : null,
+//                 "arr_time_utc": status === 1 ? moment.tz(TMZN).utc(flight.scheduledDatetime).format(FMT) : null,
+//                 "arr_actual": status === 1 ? moment(flight.estimatedDatetime).format(FMT) : null,
+//                 "arr_actual_ts": status === 1 ? moment(flight.estimatedDatetime).tz(TMZN).unix() : null,
+//                 "arr_actual_utc": status === 1 ? moment.tz(TMZN).utc(flight.estimatedDatetime).format(FMT) : null,
+//             };
+//             const departure_fields = {
+//                 "dep_actual": status === 0 ? moment(flight.estimatedDatetime).format(FMT) : null,
+//                 "dep_actual_ts": status === 0 ? moment(flight.estimatedDatetime).tz(TMZN).unix() : null,
+//                 "dep_actual_utc": status === 0 ? moment.tz(TMZN).utc(flight.estimatedDatetime).format(FMT) : null,
+//                 "dep_delayed": status === 0 ? Math.abs(moment(flight.scheduledDatetime, FMT).diff(moment(flight.estimatedDatetime, FMT), "minutes")) : null,
+//                 "dep_estimated": status === 0 ? moment(flight.estimatedDatetime).format(FMT) : null,
+//                 "dep_estimated_ts": status === 0 ? moment(flight.estimatedDatetime).tz(TMZN).unix() : null,
+//                 "dep_estimated_utc": status === 0 ? moment.tz(TMZN).utc(flight.estimatedDatetime).format(FMT) : null,
+//                 "dep_gate": status === 0 ? flight.gate : null,
+//                 "dep_iata": flight.fromCityCode,
+//                 "dep_terminal": status === 0 ? flight.gate.charAt(0) : null,
+//                 "dep_time": status === 0 ? moment(flight.scheduledDatetime).format(FMT) : null,
+//                 "dep_time_ts": status === 0 ? moment(flight.scheduledDatetime).tz(TMZN).unix() : null,
+//                 "dep_time_utc": status === 0 ? moment.tz(TMZN).utc(flight.scheduledDatetime).format(FMT) : null,
+//                 "dep_checkin":  flight.counter,
+//             };
+//             const status_fields = {
+//             "airline_iata": flight.airlineCode,
+//             "delayed":
+//                 status === 1 ? Math.abs(moment(flight.scheduledDatetime, FMT).diff(moment(flight.estimatedDatetime, FMT), "minutes")) : null ||
+//                 status === 0 ? Math.abs(moment(flight.scheduledDatetime, FMT).diff(moment(flight.estimatedDatetime, FMT), "minutes")) : null,
+//             "flight_iata": flight.flightNumber,
+//             "flight_number": flight.flightNumber.slice(2),
+//             "status": flight.remark ? flight.remark.toLowerCase() : null,
+//             "reg_number": "",
+//             // Ключи для проверки фильтрации по методам async
+//             "id": flight.id,
+//             "page_number": pageNumber,
+//             "flight_nature": status,
+//             "is_international": type,
+//             };
+//             const flight_clones = flight.codeshare.map((code) => {
+//                 const cs_fields = {
+//                     "cs_airline_iata": code.slice(0, 2),
+//                     "cs_flight_number": code.slice(2, 6),
+//                     "cs_flight_iata": code,
+//                 };
+//                 const clonedFlight = {
+//                     ...arrival_fields,
+//                     ...cs_fields,
+//                     ...departure_fields,
+//                     ...status_fields,
+//                 };
+//                 linkedFlights[cs_fields.cs_flight_iata] = clonedFlight;
+//                 return clonedFlight;
+//             });
+//         return flight_clones;
+//         }});
