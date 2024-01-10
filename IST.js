@@ -213,7 +213,10 @@ function dataFlights() {
                                                     });
 
                                                     const clonedFlight = originalFlight.map((original_fields) => {
-                                                        const cs_fields = {
+                                                        const parent_fields = {
+                                                            ...original_fields
+                                                        };
+                                                        const cs_fields_cloned = {
                                                             "cs_airline_iata": original_fields.airline_iata || null,
                                                             "cs_flight_number": original_fields.flight_number  || null,
                                                             "cs_flight_iata": original_fields.flight_iata || null,
@@ -222,8 +225,8 @@ function dataFlights() {
                                                             "flight_number": original_fields.cs_flight_number || null,
                                                         };
                                                         const flight_clones = {
-                                                            ...original_fields,
-                                                            ...cs_fields,
+                                                            ...parent_fields,
+                                                            ...cs_fields_cloned,
                                                         };
                                                         return flight_clones;
                                                     });
@@ -266,25 +269,3 @@ function dataFlights() {
         }, next_date);
     });
 }
-                                                        // for (const key in status_fields) {
-                                                        //     flight_clones[key] = status_fields[key];
-                                                        // } 
-                                                        // for (const key in cs_fields) {
-                                                        //     flight_clones[key] = cs_fields[key];
-                                                        // }
-                                                    // const clonedFlight = flight.codeshare.map((code) => {
-                                                    //     const cs_fields = {
-                                                    //         "cs_airline_iata": flight.airlineCode || null,
-                                                    //         "cs_flight_number": flight.flightNumber.slice(2)  || null,
-                                                    //         "cs_flight_iata": flight.flightNumber || null,
-                                                    //     };
-                                                    //     const status_fields = {
-                                                    //         "airline_iata": status === 1 ? code.slice(0, 2) : status === 0 ? code.slice(0, 2) : null,
-                                                    //         "flight_iata": status === 1 ? code : status === 0 ? code : null,
-                                                    //         "flight_number": status === 1 ? code.slice(2, 6) : status === 0 ? code.slice(2, 6) : null,
-                                                    //     };
-                                                    //     const flight_clones = {
-                                                    //         ...status_fields,
-                                                    //         ...cs_fields,
-                                                    //     };
-                                                    //     return flight_clones;
