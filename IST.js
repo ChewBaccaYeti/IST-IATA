@@ -149,8 +149,8 @@ function dataFlights() {
 
                                                 const flightsArray = obj.result.data.flights;
 
-                                                const newFlightsFields = flightsArray.flatMap((flight) => {
-                                                    const general_fields = {
+                                                const newFlightsFields = flightsArray.flatMap((flight) => { // Разглаживаю массив для получения всех рейсов, если они есть внутри 
+                                                        const general_fields = {
                                                         "aircraft_icao": "" || null,
                                                         "airline_iata": status === 0 ? flight.airlineCode : status === 1 ? flight.airlineCode : null,
                                                         "airline_icao": "" || null,
@@ -165,12 +165,12 @@ function dataFlights() {
                                                             status === 0 ? (Math.abs(moment(flight.scheduledDatetime, frmt).diff(moment(flight.estimatedDatetime, frmt), "minutes")) || null) : null ||
                                                             status === 1 ? (Math.abs(moment(flight.scheduledDatetime, frmt).diff(moment(flight.estimatedDatetime, frmt), "minutes")) || null) : null,
                                                         };
-                                                    const cs_fields = {
+                                                        const cs_fields = {
                                                             "cs_airline_iata": null,
                                                             "cs_flight_number": null,
                                                             "cs_flight_iata": null,
                                                         };
-                                                    const arr_fields = {
+                                                        const arr_fields = {
                                                             "arr_baggage": flight.carousel || null,
                                                             "arr_delayed": status === 0 ? (Math.abs(moment(flight.scheduledDatetime, frmt).diff(moment(flight.estimatedDatetime, frmt), "minutes")) || null) : null,
                                                             "arr_gate": status === 0 ? flight.gate : null,
@@ -180,8 +180,14 @@ function dataFlights() {
                                                             "arr_time": status === 0 ? moment(flight.scheduledDatetime).format(frmt) : null,
                                                             "arr_time_ts": status === 0 ? moment(flight.scheduledDatetime).tz(tmzn).unix() : null,
                                                             "arr_time_utc": status === 0 ? moment.tz(tmzn).utc(flight.scheduledDatetime).format(frmt) : null,
+                                                            "arr_estimated": status === 0 ? moment(flight.estimatedDatetime).format(frmt) : null,
+                                                            "arr_estimated_ts": status === 0 ? moment(flight.estimatedDatetime).tz(tmzn).unix() : null,
+                                                            "arr_estimated_utc": status === 0 ? moment.tz(tmzn).utc(flight.estimatedDatetime).format(frmt) : null,
+                                                            "arr_actual": status === 0 ? moment(flight.estimatedDatetime).format(frmt) : null,
+                                                            "arr_actual_ts": status === 0 ? moment(flight.estimatedDatetime).tz(tmzn).unix() : null,
+                                                            "arr_actual_utc": status === 0 ? moment.tz(tmzn).utc(flight.estimatedDatetime).format(frmt) : null,
                                                         };
-                                                    const dep_fields = {
+                                                        const dep_fields = {
                                                             "dep_checkin": status === 1 ?  flight.counter : null,
                                                             "dep_delayed": status === 1 ? (Math.abs(moment(flight.scheduledDatetime, frmt).diff(moment(flight.estimatedDatetime, frmt), "minutes")) || null) : null,
                                                             "dep_gate": status === 1 ? flight.gate : null,
@@ -191,8 +197,14 @@ function dataFlights() {
                                                             "dep_time": status === 1 ? moment(flight.scheduledDatetime).format(frmt) : null,
                                                             "dep_time_ts": status === 1 ? moment(flight.scheduledDatetime).tz(tmzn).unix() : null,
                                                             "dep_time_utc": status === 1 ? moment.tz(tmzn).utc(flight.scheduledDatetime).format(frmt) : null,
+                                                            "dep_estimated": status === 1 ? moment(flight.estimatedDatetime).format(frmt) : null,
+                                                            "dep_estimated_ts": status === 1 ? moment(flight.estimatedDatetime).tz(tmzn).unix() : null,
+                                                            "dep_estimated_utc": status === 1 ? moment.tz(tmzn).utc(flight.estimatedDatetime).format(frmt) : null,
+                                                            "dep_actual": status === 1 ? moment(flight.estimatedDatetime).format(frmt) : null,
+                                                            "dep_actual_ts": status === 1 ? moment(flight.estimatedDatetime).tz(tmzn).unix() : null,
+                                                            "dep_actual_utc": status === 1 ? moment.tz(tmzn).utc(flight.estimatedDatetime).format(frmt) : null,
                                                         };
-                                                    const original_flight = {
+                                                        const original_flight = {
                                                             ...general_fields,
                                                             ...cs_fields,
                                                             ...arr_fields,
@@ -218,16 +230,16 @@ function dataFlights() {
                                                         ...cloned_flight[0], // Поскольку map возвращает массив, возьмем первый элемент
                                                     };
     
-                                                    if (type === 1 ? (status === 1 ? flight : status === 0 ? flight : null) 
+                                                    if (type === 1 ? (status === 1 ? flight : status === 0 ? flight : null) // Фильтрую по типу и при совпадении фильтр проходит глубже по статусу
                                                         : type === 0 ? (status === 0 ? flight : status === 1 ? flight : null) : null) {
                                                         newFlightsArray.push(flights_bucket);
                                                         return flights_bucket;
                                                     }
 
-                                                const uniqueFlights = [...new Set([...flights_bucket])];
-                                                newFlightsArray.push(...uniqueFlights);
-                                                return uniqueFlights;
-                                            });
+                                                    const uniqueFlights = [...new Set([...flights_bucket])]; // Создаю новый set для уникальных рейсов
+                                                    newFlightsArray.push(...uniqueFlights);
+                                                    return uniqueFlights;
+                                                });
 
                                                 for (const flight in newFlightsArray) {
                                                     const cloned_flight = { ...newFlightsArray[flight] };
@@ -271,33 +283,3 @@ function dataFlights() {
         }, next_date);
     });
 }
-                                                            // "arr_estimated": status === 0 ? moment(flight.estimatedDatetime).format(frmt) : null,
-                                                            // "arr_estimated_ts": status === 0 ? moment(flight.estimatedDatetime).tz(tmzn).unix() : null,
-                                                            // "arr_estimated_utc": status === 0 ? moment.tz(tmzn).utc(flight.estimatedDatetime).format(frmt) : null,
-                                                            // "arr_actual": status === 0 ? moment(flight.estimatedDatetime).format(frmt) : null,
-                                                            // "arr_actual_ts": status === 0 ? moment(flight.estimatedDatetime).tz(tmzn).unix() : null,
-                                                            // "arr_actual_utc": status === 0 ? moment.tz(tmzn).utc(flight.estimatedDatetime).format(frmt) : null,
-                                                            // "dep_estimated": status === 1 ? moment(flight.estimatedDatetime).format(frmt) : null,
-                                                            // "dep_estimated_ts": status === 1 ? moment(flight.estimatedDatetime).tz(tmzn).unix() : null,
-                                                            // "dep_estimated_utc": status === 1 ? moment.tz(tmzn).utc(flight.estimatedDatetime).format(frmt) : null,
-                                                            // "dep_actual": status === 1 ? moment(flight.estimatedDatetime).format(frmt) : null,
-                                                            // "dep_actual_ts": status === 1 ? moment(flight.estimatedDatetime).tz(tmzn).unix() : null,
-                                                            // "dep_actual_utc": status === 1 ? moment.tz(tmzn).utc(flight.estimatedDatetime).format(frmt) : null,
-
-                                                            // const clonedFlight = originalFlight.map((original_fields) => {
-                                                            //     const cs_fields_cloned = {
-                                                            //         "cs_airline_iata": original_fields.airline_iata || null,
-                                                            //         "cs_flight_number": original_fields.flight_number  || null,
-                                                            //         "cs_flight_iata": original_fields.flight_iata || null,
-                                                            //     };
-                                                            //     const general_fields_cloned = {
-                                                            //         "airline_iata": original_fields.cs_airline_iata || null,
-                                                            //         "flight_iata": original_fields.cs_flight_iata || null,
-                                                            //         "flight_number": original_fields.cs_flight_number || null,
-                                                            //     }
-                                                            //     const cloned_fields = {
-                                                            //         ...general_fields_cloned,
-                                                            //         ...cs_fields_cloned,
-                                                            //     };
-                                                            //     return cloned_fields;
-                                                            // });
