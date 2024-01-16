@@ -3,6 +3,7 @@ const request = require("request");
 const colors = require("colors").default;
 const express = require("express");
 const moment = require("moment-timezone");
+const _ = require("lodash")
 
 const port = 11288;
 const base_url = "https://www.istairport.com/umbraco/api/FlightInfo/GetFlightStatusBoard";
@@ -91,7 +92,7 @@ function dataFlights() {
     let newFlightsArray = [];
     let finished = false; // Флаг для остановки цикла async.until
     let pageNumber = 1;
-    
+
     async.eachSeries(dates, (date, next_date) => {
         async.eachSeries([1, 0], (status, next_status) => {
             async.each([0, 1], (type, next_type) => {
@@ -213,22 +214,47 @@ function dataFlights() {
                                                     const flights_bucket = {
                                                         ...original_flight,
                                                     };
-                                                
                                                     // Фильтруем по статусу и добавляем родителя в массив
                                                     if (status === 1 ? flight : status === 0 ? flight : null) {
+                                                        console.log('Adding parent:', flights_bucket);
                                                         newFlightsArray.push(flights_bucket);
-                                                        // Добавляем детей в массив
-                                                    newFlightsArray.push(...flight.codeshare.map((code) => ({
-                                                        ...flights_bucket,
-                                                        "cs_airline_iata": flights_bucket.airline_iata || null,
-                                                        "cs_flight_number": flights_bucket.flight_number || null,
-                                                        "cs_flight_iata": flights_bucket.flight_iata || null,
-                                                        "airline_iata": status === 0 ? code.slice(0, 2) : status === 1 ? code.slice(0, 2) : null,
-                                                        "flight_iata": status === 0 ? code : status === 1 ? code : null,
-                                                        "flight_number": status === 0 ? code.slice(2, 6) : status === 1 ? code.slice(2, 6) : null,
-                                                    })));
+                                                        // Добавляем детей в массив, если они есть
+                                                        if (flight.codeshare && flight.codeshare.length > 0) {
+                                                            console.log('Adding children:', flight.codeshare);
+                                                            newFlightsArray.push(...flight.codeshare.map((code) => ({
+                                                                    ...flights_bucket,
+                                                                    "cs_airline_iata": flights_bucket.airline_iata || null,
+                                                                    "cs_flight_number": flights_bucket.flight_number || null,
+                                                                    "cs_flight_iata": flights_bucket.flight_iata || null,
+                                                                    "airline_iata": status === 0 ? code.slice(0, 2) : status === 1 ? code.slice(0, 2) : null,
+                                                                    "flight_iata": status === 0 ? code : status === 1 ? code : null,
+                                                                    "flight_number": status === 0 ? code.slice(2, 6) : status === 1 ? code.slice(2, 6) : null,
+                                                                })));
+                                                        }
                                                         return flights_bucket;
-                                                    }});                                            
+                                                    }
+                                                });
+
+                                                function findDuplicatesByKey(arr, key) {
+                                                    const duplicates = [];
+                                                    for (let i = 0; i < arr.length; i++) {
+                                                        for (let j = i + 1; j < arr.length; j++) {
+                                                            if (arr[i][key] === arr[j][key]) {
+                                                                duplicates.push({ duplicate1: arr[i], duplicate2: arr[j] });
+                                                            }
+                                                        }
+                                                    }
+                                                    return duplicates;
+                                                }
+                                                
+                                                // Пример использования
+                                                const duplicates = findDuplicatesByKey(newFlightsArray, 'flight_iata');
+                                                if (duplicates.length > 0) {
+                                                    console.log('Duplicates found:', duplicates);
+                                                } else {
+                                                    console.log('No duplicates found.');
+                                                }
+                                                
 
                                                 if (newFlightsFields.length >= max_page_size) {
                                                     finished = false;
@@ -238,10 +264,12 @@ function dataFlights() {
                                                     console.log("Loop is over.".bgBlue);
                                                 }
                                                 retry_done();
-
-                                                console.log(`Page ${pageNumber}, Date ${date}`.blue, newFlightsFields,);
-                                                console.log('Request completed successfully.'.green);
-                                                console.log(`Proxy is configured and request were made via proxy: ${proxy}`.cyan);
+                                                
+                                                if (newFlightsFields.length > 0) {
+                                                    console.log(`Page ${pageNumber}, Date ${date}`.blue, newFlightsFields);
+                                                    console.log('Request completed successfully.'.green);
+                                                    console.log(`Proxy is configured and request were made via proxy: ${proxy}`.cyan);
+                                                }
                                                 return newFlightsFields;
 
                                             } catch (error) {
@@ -264,12 +292,3 @@ function dataFlights() {
         }, next_date);
     });
 }
-
-// Создаю новый set для уникальных рейсов
-// const uniqueFlights = [...new Set([...flights_bucket])]; 
-// return uniqueFlights;
-
-// if (type === 1 ? (status === 1 ? flight : status === 0 ? flight : null) : 
-//     type === 0 ? (status === 0 ? flight : status === 1 ? flight : null) : null) {
-// return flights_bucket;
-// }
