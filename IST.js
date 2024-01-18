@@ -3,7 +3,6 @@ const request = require("request");
 const colors = require("colors").default;
 const express = require("express");
 const moment = require("moment-timezone");
-const _ = require("lodash")
 
 const port = 11288;
 const base_url = "https://www.istairport.com/umbraco/api/FlightInfo/GetFlightStatusBoard";
@@ -152,11 +151,11 @@ function dataFlights() {
                                                 // Разглаживаю массив для получения всех рейсов, если они есть внутри 
                                                 const newFlightsFields = flightsArray.flatMap((flight) => { 
                                                     const general_fields = {
-                                                        "aircraft_icao": "" || null,
+                                                        // "aircraft_icao": "" || null,
                                                         "airline_iata": status === 0 ? flight.airlineCode : status === 1 ? flight.airlineCode : null,
-                                                        "airline_icao": "" || null,
+                                                        // "airline_icao": "" || null,
                                                         "flight_iata": status === 0 ? flight.flightNumber : status === 1 ? flight.flightNumber : null,
-                                                        "flight_icao": "" || null,
+                                                        // "flight_icao": "" || null,
                                                         "flight_number": status === 0 ? flight.flightNumber.slice(2) : status === 1 ? flight.flightNumber.slice(2) : null,
                                                         "status": flight.remark ? flight.remark.toLowerCase() : null,
                                                         "duration": 
@@ -176,7 +175,7 @@ function dataFlights() {
                                                         "arr_delayed": status === 0 ? (Math.abs(moment(flight.scheduledDatetime, frmt).diff(moment(flight.estimatedDatetime, frmt), "minutes")) || null) : null,
                                                         "arr_gate": status === 0 ? flight.gate : null,
                                                         "arr_iata": flight.toCityCode || null,
-                                                        "arr_icao": flight.toCityName || null,
+                                                        // "arr_icao": flight.toCityName || null,
                                                         "arr_terminal": status === 0 ? flight.gate.charAt(0) : null,
                                                         "arr_time": status === 0 ? moment(flight.scheduledDatetime).format(frmt) : null,
                                                         "arr_time_ts": status === 0 ? moment(flight.scheduledDatetime).tz(tmzn).unix() : null,
@@ -193,7 +192,7 @@ function dataFlights() {
                                                         "dep_delayed": status === 1 ? (Math.abs(moment(flight.scheduledDatetime, frmt).diff(moment(flight.estimatedDatetime, frmt), "minutes")) || null) : null,
                                                         "dep_gate": status === 1 ? flight.gate : null,
                                                         "dep_iata": flight.fromCityCode || null,
-                                                        "dep_icao": flight.fromCityName || null,
+                                                        // "dep_icao": flight.fromCityName || null,
                                                         "dep_terminal": status === 1 ? flight.gate.charAt(0) : null,
                                                         "dep_time": status === 1 ? moment(flight.scheduledDatetime).format(frmt) : null,
                                                         "dep_time_ts": status === 1 ? moment(flight.scheduledDatetime).tz(tmzn).unix() : null,
@@ -235,26 +234,34 @@ function dataFlights() {
                                                     }
                                                 });
 
-                                                function findDuplicatesByKey(arr, key) {
+                                                function findAndRemoveDuplicatesByKey(arr, key) {
                                                     const duplicates = [];
+                                                    const uniqueItems = [];
                                                     for (let i = 0; i < arr.length; i++) {
+                                                        let isDuplicate = false;
                                                         for (let j = i + 1; j < arr.length; j++) {
                                                             if (arr[i][key] === arr[j][key]) {
                                                                 duplicates.push({ duplicate1: arr[i], duplicate2: arr[j] });
+                                                                isDuplicate = true;
+                                                                break;
                                                             }
                                                         }
+                                                        if (!isDuplicate) {
+                                                            uniqueItems.push(arr[i]);
+                                                        }
                                                     }
-                                                    return duplicates;
+                                                    return { duplicates, uniqueItems };
                                                 }
-                                                
-                                                // Пример использования
-                                                const duplicates = findDuplicatesByKey(newFlightsArray, 'flight_iata');
+
+                                                const { duplicates, uniqueItems } = findAndRemoveDuplicatesByKey(newFlightsArray, 'flight_iata');
                                                 if (duplicates.length > 0) {
                                                     console.log('Duplicates found:', duplicates);
+                                                    console.log('Unique items:', uniqueItems);
+                                                    //Удаляю дубликаты из исходного массива, заменив его уникальными рейсами
+                                                    newFlightsArray = uniqueItems;
                                                 } else {
                                                     console.log('No duplicates found.');
                                                 }
-                                                
 
                                                 if (newFlightsFields.length >= max_page_size) {
                                                     finished = false;
