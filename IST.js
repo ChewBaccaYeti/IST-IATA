@@ -1,8 +1,10 @@
+const { NotFound } = require('http-errors');
 const async = require('async');
 const colors = require('colors').default;
 const express = require('express');
 const fs = require('fs/promises');
 const moment = require('moment-timezone');
+const morgan = require('morgan');
 const request = require('request');
 
 const port = 11288;
@@ -44,10 +46,12 @@ const app = express();
 
 // http://localhost:3000/schedules - endpoint для получения расписания рейсов
 app.get('/schedules', (req, res) => {
-    redis.get(redis_key, (e, reply) => {
+    redis.get(redis_key, (error, reply) => {
         // Вывод в консоль новых данных после каждого обновления хоста в браузере
-        console.log('Reply from Redis:', reply);
-        if (!reply) return res.status(404).json({ error: 'Data not found.' });
+        console.log('Reply from Redis:', JSON.parse(reply));
+        if (!reply) {
+            throw new NotFound(error, 'Data not found.')
+        };
         try {
             res.json({
                 status: 'success',
@@ -56,7 +60,7 @@ app.get('/schedules', (req, res) => {
                     result: JSON.parse(reply)
                 }
             });
-        } catch (e) {
+        } catch (error) {
             res.status(500).json({ error: 'Internal Server Error.' });
         }
     });
@@ -64,12 +68,12 @@ app.get('/schedules', (req, res) => {
     const { method, url } = req;
     const date = moment().format(frmt);
     try {
-        fs.appendFileSync('./public/server.log', `\n${method} ${url} ${date}`);
+        fs.appendFile('./public/server.log', `\n${method} ${url} ${date}`);
     } catch (error) {
         console.error(`Error writing to log file: ${error}`.bgRed.bold);
     }
     next();
-}).listen(port, () => {
+}).use(morgan('dev')).listen(port, () => {
     console.log(`Server started on port ${port}`.yellow);
 });
 
@@ -133,7 +137,6 @@ function dataFlights() {
                                         `date=${date}`,
                                         `endDate=${date}`,
                                     ],
-                                    nature: status,
                                     flightNature: status, // 1 - departure, 0 - arrival
                                     isInternational: type, // 0 - domestic, 1 - international
                                     searchTerm: 'changeflight',
