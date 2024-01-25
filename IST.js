@@ -10,9 +10,7 @@ const request = require('request');
 const port = 11288;
 const base_url = 'https://www.istairport.com/umbraco/api/FlightInfo/GetFlightStatusBoard';
 const headers = {
-    'Accept': 'application/json, text/javascript, */*; q=0.01',
     'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-    'Origin': 'https://www.istairport.com',
     'Referer': 'https://www.istairport.com/en/flights/flight-info/departure-flights/?locale=en',
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
 };
@@ -43,7 +41,6 @@ redis.del(redis_key, (err, reply) => {
 })
 
 const app = express();
-
 // http://localhost:3000/schedules - endpoint для получения расписания рейсов
 app.get('/schedules', (req, res) => {
     redis.get(redis_key, (error, reply) => {
@@ -113,14 +110,14 @@ function dataFlights() {
     let finished = false; // Флаг для остановки цикла async.until
     let pageNumber = 1;
 
-    async.eachSeries(dates, (date, next_date) => {
-        async.eachSeries([1, 0], (status, next_status) => {
+    async.each(dates, (date, next_date) => {
+        async.each([1, 0], (status, next_status) => {
             async.each([0, 1], (type, next_type) => {
 
                 let tries = 0;
                 async.until((cb) => { // test 
                     cb(null, finished);
-                }, (done) => { // iter 
+                }, (until_done) => { // iter 
                     async.retry(max_retries, (retry_done) => {
                         if (tries) console.log(`[retrying#${tries}] ${base_url}`.yellow);
                         tries++;
@@ -134,8 +131,8 @@ function dataFlights() {
                                     pageNumber,
                                     pageSize: max_page_size,
                                     '': [
-                                        `date=${date}`,
-                                        `endDate=${date}`,
+                                        `date=${dates[0]}`,
+                                        `endDate=${dates[1]}`,
                                     ],
                                     flightNature: status, // 1 - departure, 0 - arrival
                                     isInternational: type, // 0 - domestic, 1 - international
@@ -297,14 +294,14 @@ function dataFlights() {
                                         console.log('Request completed successfully.'.green);
                                         console.log(`Proxy is configured and request were made via proxy: ${proxy}`.cyan);
                                     }
-                                    return newFlightsFields;
+                                    return newFlightsArray;
 
                                 } catch (error) {
                                     console.log(`[error] ${error}`.red.bold);
                                     return retry_done(true);
                                 }
                             });
-                    }, done);
+                    }, until_done);
                 },
                     () => {
                         setRedisData(redis_key, newFlightsArray, (err) => {
