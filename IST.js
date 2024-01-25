@@ -155,7 +155,6 @@ function dataFlights() {
 
                                 try {
                                     const obj = JSON.parse(body);
-                                    const data = obj.result.data.flights;
                                     if (
                                         !obj.result ||
                                         !obj.result.data
@@ -166,7 +165,7 @@ function dataFlights() {
                                         return retry_done(true);
                                     }
 
-                                    const flightsArray = data;
+                                    const flightsArray = obj.result.data.flights;;
                                     // Разглаживаю массив для получения всех рейсов, если они есть внутри 
                                     const newFlightsFields = flightsArray.flatMap((flight) => {
                                         const general_fields = {
@@ -299,21 +298,20 @@ function dataFlights() {
                                     return newFlightsArray;
 
                                 } catch (error) {
-                                    console.log(`[error] ${error}`.red.bold);
+                                    console.error(`[error] ${error}`.red.bold);
                                     return retry_done(true);
                                 }
                             }, retry_done);
                     }, until_done);
-                },
-                    () => {
-                        setRedisData(redis_key, newFlightsArray, (err) => {
-                            if (err) {
-                                console.error('Error while saving data to Redis:'.bgRed.bold, err);
-                            } else {
-                                console.log(`[${day}][redis] data saved successfully.`.magenta);
-                            }
-                        });
-                    }, next_type());
+                }, () => {
+                    setRedisData(redis_key, newFlightsArray, (err) => {
+                        if (err) {
+                            console.error('Error while saving data to Redis:'.bgRed.bold, err);
+                        } else {
+                            console.log(`[${day}][redis] data saved successfully.`.magenta);
+                        }
+                    });
+                }, next_type());
             }, next_status());
         }, next_date());
     });
