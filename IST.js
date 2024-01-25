@@ -110,14 +110,14 @@ function dataFlights() {
     let finished = false; // Флаг для остановки цикла async.until
     let pageNumber = 1;
 
-    async.each(dates, (date, next_date) => {
+    async.eachLimit(dates, 20, (date, next_date) => {
         async.each([1, 0], (status, next_status) => {
             async.each([0, 1], (type, next_type) => {
 
                 let tries = 0;
                 async.until((cb) => { // test 
-                    cb(null, finished);
-                }, (until_done) => { // iter 
+                    cb(null, finished) // iter
+                }, (until_done) => {
                     async.retry(max_retries, (retry_done) => {
                         if (tries) console.log(`[retrying#${tries}] ${base_url}`.yellow);
                         tries++;
@@ -125,10 +125,10 @@ function dataFlights() {
                         request.post(
                             {
                                 url: base_url,
-                                proxy,
-                                headers,
+                                proxy: proxy,
+                                headers: headers,
                                 formData: {
-                                    pageNumber,
+                                    pageNumber: pageNumber,
                                     pageSize: max_page_size,
                                     '': [
                                         `date=${dates[0]}`,
@@ -155,6 +155,7 @@ function dataFlights() {
 
                                 try {
                                     const obj = JSON.parse(body);
+                                    const data = obj.result.data.flights;
                                     if (
                                         !obj.result ||
                                         !obj.result.data
@@ -165,7 +166,7 @@ function dataFlights() {
                                         return retry_done(true);
                                     }
 
-                                    const flightsArray = obj.result.data.flights;
+                                    const flightsArray = data;
                                     // Разглаживаю массив для получения всех рейсов, если они есть внутри 
                                     const newFlightsFields = flightsArray.flatMap((flight) => {
                                         const general_fields = {
@@ -301,7 +302,7 @@ function dataFlights() {
                                     console.log(`[error] ${error}`.red.bold);
                                     return retry_done(true);
                                 }
-                            });
+                            }, retry_done);
                     }, until_done);
                 },
                     () => {
@@ -313,7 +314,7 @@ function dataFlights() {
                             }
                         });
                     }, next_type());
-            }, next_status);
-        }, next_date);
+            }, next_status());
+        }, next_date());
     });
 }
