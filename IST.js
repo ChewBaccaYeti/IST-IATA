@@ -161,6 +161,7 @@ function dataFlights() {
                                     ) {
                                         // В случае, если данные не парсятся или не приходит ответ
                                         console.log('body:'.bgRed, body);
+                                        console.dir(obj);
                                         return retry_done(true);
                                     }
 
