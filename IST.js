@@ -1,4 +1,3 @@
-const { NotFound } = require('http-errors');
 const async = require('async');
 const colors = require('colors').default;
 const express = require('express');
@@ -47,7 +46,7 @@ app.get('/schedules', (req, res) => {
         // Вывод в консоль новых данных после каждого обновления хоста в браузере
         console.log('Reply from Redis:', JSON.parse(reply));
         if (!reply) {
-            throw new NotFound(error, 'Data not found.')
+            return res.status(404).json({ error: 'Data not found.' });
         };
         try {
             res.json({
