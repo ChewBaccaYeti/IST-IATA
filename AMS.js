@@ -213,9 +213,8 @@ const list = () => {
                     async.until(
                         () => !!ended,
                         (next_page) => {
-                            const url = `${base}/en/${type}/?date=${date}&offset=${
-                                page * offset
-                            }`;
+                            const url = `${base}/en/${type}/?date=${date}&offset=${page * offset
+                                }`;
 
                             let tries = 0;
                             async.retry(

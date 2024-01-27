@@ -130,8 +130,8 @@ function dataFlights() {
                                     pageNumber: pageNumber,
                                     pageSize: max_page_size,
                                     '': [
-                                        `date=${dates[0]}`,
-                                        `endDate=${dates[1]}`,
+                                        `date=${date}`,
+                                        `endDate=${date}`,
                                     ],
                                     flightNature: status, // 1 - departure, 0 - arrival
                                     isInternational: type, // 0 - domestic, 1 - international
