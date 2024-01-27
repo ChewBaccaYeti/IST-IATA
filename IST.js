@@ -164,7 +164,7 @@ function dataFlights() {
                                         return retry_done(true);
                                     }
 
-                                    const flightsArray = obj.result.data.flights;;
+                                    const flightsArray = obj.result.data.flights;
                                     // Разглаживаю массив для получения всех рейсов, если они есть внутри 
                                     const newFlightsFields = flightsArray.flatMap((flight) => {
                                         const general_fields = {
